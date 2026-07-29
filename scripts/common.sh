@@ -31,26 +31,36 @@ require_file() {
 # --- logging ---------------------------------------------------------------
 
 # start_log 00_oneline
-# Tees everything from here on into $LOGDIR/<RUN_ID>_<step>.log as well as the
-# terminal, and points $LOGDIR/latest_<step>.log at it.
+# Tees everything from here on into $RNAC_LOGDIR/<RNAC_RUN_ID>_<step>.log as well as the
+# terminal, and points $RNAC_LOGDIR/latest_<step>.log at it.
 #
 # An EXIT trap restores the original file descriptors, which makes tee see EOF
 # and flush. Without that, a script dying mid-run can lose its last few lines --
 # exactly the lines you need when something failed.
 start_log() {
   LOGSTEP=$1
-  mkdir -p "$LOGDIR"
-  LOGFILE="$LOGDIR/${RUN_ID}_${LOGSTEP}.log"
+  mkdir -p "$RNAC_LOGDIR"
+  LOGFILE="$RNAC_LOGDIR/${RNAC_RUN_ID}_${LOGSTEP}.log"
 
   exec 3>&1 4>&2                        # save real stdout/stderr
   exec > >(tee "$LOGFILE") 2>&1
 
   # Stable name so you never have to look up a timestamp:
   #   tail -f data/logs/latest_00_oneline.log
-  ln -sfn "$(basename "$LOGFILE")" "$LOGDIR/latest_${LOGSTEP}.log"
+  ln -sfn "$(basename "$LOGFILE")" "$RNAC_LOGDIR/latest_${LOGSTEP}.log"
 
   trap _close_log EXIT
-  log "===== $LOGSTEP started (run $RUN_ID) ====="
+  log "===== $LOGSTEP started (run $RNAC_RUN_ID) ====="
+
+  # Surface any RNAC_* overrides in effect. A per-command prefix and a stale
+  # `export` are indistinguishable from inside the script, so the only defence
+  # against the latter is to print whatever is actually set.
+  if [ "${#RNAC_OVERRIDES[@]}" -gt 0 ]; then
+    local v
+    for v in "${RNAC_OVERRIDES[@]}"; do
+      log "override: $v=${!v}"
+    done
+  fi
 }
 
 _close_log() {
@@ -91,7 +101,7 @@ conda_activate() {
   set -u
 
   conda env list | awk '{print $1}' | grep -qx -- "$env" \
-    || die "conda env '$env' does not exist — create it with: conda env create -f $REPO/step2_clustering/${env}*.yml"
+    || die "conda env '$env' does not exist — create it with: conda env create -f $RNAC_REPO/step2_clustering/${env}*.yml"
 
   set +u
   if ! conda activate "$env"; then set -u; die "failed to activate conda env '$env'"; fi
@@ -120,9 +130,9 @@ docker_preflight() {
     || die "docker not on PATH"
   docker info >/dev/null 2>&1 \
     || die "cannot reach the docker daemon. If this is a permission error: sudo usermod -aG docker \$USER, then log out and back in"
-  docker image inspect "$IMAGE" >/dev/null 2>&1 \
-    || die "image '$IMAGE' not present locally — run: docker pull $IMAGE"
-  log "docker image: $IMAGE"
+  docker image inspect "$RNAC_IMAGE" >/dev/null 2>&1 \
+    || die "image '$RNAC_IMAGE' not present locally — run: docker pull $RNAC_IMAGE"
+  log "docker image: $RNAC_IMAGE"
 }
 
 # --- FASTA validation ------------------------------------------------------

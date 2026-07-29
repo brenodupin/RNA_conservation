@@ -3,19 +3,19 @@
 # 02_clusters.sh — add reverse-complement windows, cluster in two mmseqs2
 #                  passes, and split each cluster into its own FASTA.
 #
-#   in : $DATA/$STEP_01/<prefix>_processed_noNs_polyN_uniq.fasta
-#   out: $DATA/$STEP_02/<prefix>_revComp.fasta
-#        $DATA/$STEP_02/<prefix>_bothStrands.fasta        clustering input
-#        $DATA/$STEP_02/mmseq2_covmode0_PID95_cov80_*     pass 1 (redundancy)
-#        $DATA/$STEP_02/mmseq2_repSeqs_covmode0_PID50_cov80_*   pass 2 (clusters)
-#        $DATA/$STEP_02/cluster_count.tsv                 members per cluster
-#        $DATA/$STEP_02/splits/<rep>_cluster.fasta        one file per cluster
+#   in : $RNAC_DATA/$RNAC_STEP_01/<prefix>_processed_noNs_polyN_uniq.fasta
+#   out: $RNAC_DATA/$RNAC_STEP_02/<prefix>_revComp.fasta
+#        $RNAC_DATA/$RNAC_STEP_02/<prefix>_bothStrands.fasta        clustering input
+#        $RNAC_DATA/$RNAC_STEP_02/mmseq2_covmode0_PID95_cov80_*     pass 1 (redundancy)
+#        $RNAC_DATA/$RNAC_STEP_02/mmseq2_repSeqs_covmode0_PID50_cov80_*   pass 2 (clusters)
+#        $RNAC_DATA/$RNAC_STEP_02/cluster_count.tsv                 members per cluster
+#        $RNAC_DATA/$RNAC_STEP_02/splits/<rep>_cluster.fasta        one file per cluster
 #
 #   ./02_clusters.sh                     normal run
-#   FORCE=1 ./02_clusters.sh             rebuild everything
-#   RUN_REVCOMP=0 ./02_clusters.sh       strand-specific input, skip minus strand
-#   SPLIT_METHOD=awk ./02_clusters.sh    fast splitter (identical output)
-#   PID_PASS2=0.40 ./02_clusters.sh      looser cluster threshold
+#   RNAC_FORCE=1 ./02_clusters.sh             rebuild everything
+#   RNAC_RUN_REVCOMP=0 ./02_clusters.sh       strand-specific input, skip minus strand
+#   RNAC_SPLIT_METHOD=awk ./02_clusters.sh    fast splitter (identical output)
+#   RNAC_PID_PASS2=0.40 ./02_clusters.sh      looser cluster threshold
 #
 # Upstream marks this whole step optional: skip it if your input sequences are
 # already a defined, related set (e.g. UTRs of one gene family) rather than
@@ -29,15 +29,15 @@ source "$HERE/info.sh"
 # shellcheck source=common.sh
 source "$HERE/common.sh"
 
-STEP="$STEP_02"
-INDIR="$DATA/$STEP_01"
-OUTDIR="$DATA/$STEP"
+STEP="$RNAC_STEP_02"
+INDIR="$RNAC_DATA/$RNAC_STEP_01"
+OUTDIR="$RNAC_DATA/$STEP"
 SPLITDIR="$OUTDIR/splits"
-SRC="$REPO/step2_clustering"
+SRC="$RNAC_REPO/step2_clustering"
 
 start_log "$STEP"
 
-UNIQ="$INDIR/${WINDOWS_PREFIX}_processed_noNs_polyN_uniq.fasta"
+UNIQ="$INDIR/${RNAC_WINDOWS_PREFIX}_processed_noNs_polyN_uniq.fasta"
 require_file "$UNIQ"
 mkdir -p "$OUTDIR"
 
@@ -46,13 +46,13 @@ mkdir -p "$OUTDIR"
 frac_ok() { awk -v v="$1" 'BEGIN{ exit !(v > 0 && v <= 1) }'; }
 pct()     { awk -v v="$1" 'BEGIN{ printf "%d", v*100 + 0.5 }'; }
 
-for v in PID_PASS1 PID_PASS2 COVERAGE; do
+for v in RNAC_PID_PASS1 RNAC_PID_PASS2 RNAC_COVERAGE; do
   frac_ok "${!v}" || die "$v must be a fraction in (0,1], got '${!v}'"
 done
-awk -v a="$PID_PASS2" -v b="$PID_PASS1" 'BEGIN{ exit !(a <= b) }' \
-  || die "PID_PASS2 ($PID_PASS2) should not exceed PID_PASS1 ($PID_PASS1): pass 2 clusters the survivors of pass 1 at a looser threshold"
+awk -v a="$RNAC_PID_PASS2" -v b="$RNAC_PID_PASS1" 'BEGIN{ exit !(a <= b) }' \
+  || die "RNAC_PID_PASS2 ($RNAC_PID_PASS2) should not exceed RNAC_PID_PASS1 ($RNAC_PID_PASS1): pass 2 clusters the survivors of pass 1 at a looser threshold"
 
-log "pass1 min-seq-id=$PID_PASS1  pass2 min-seq-id=$PID_PASS2  coverage=$COVERAGE  threads=$THREADS"
+log "pass1 min-seq-id=$RNAC_PID_PASS1  pass2 min-seq-id=$RNAC_PID_PASS2  coverage=$RNAC_COVERAGE  threads=$RNAC_THREADS"
 
 # --- reverse complement ----------------------------------------------------
 #
@@ -63,14 +63,14 @@ log "pass1 min-seq-id=$PID_PASS1  pass2 min-seq-id=$PID_PASS2  coverage=$COVERAG
 # strand; it survives all the way to the final motif coordinates, so do not
 # change it without checking step 6's coordinate handling.
 
-REVCOMP="$OUTDIR/${WINDOWS_PREFIX}_revComp.fasta"
-BOTH="$OUTDIR/${WINDOWS_PREFIX}_bothStrands.fasta"
+REVCOMP="$OUTDIR/${RNAC_WINDOWS_PREFIX}_revComp.fasta"
+BOTH="$OUTDIR/${RNAC_WINDOWS_PREFIX}_bothStrands.fasta"
 
-if [ "$RUN_REVCOMP" = "1" ]; then
-  if [ -s "$BOTH" ] && [ "$FORCE" != "1" ]; then
+if [ "$RNAC_RUN_REVCOMP" = "1" ]; then
+  if [ -s "$BOTH" ] && [ "$RNAC_FORCE" != "1" ]; then
     log "skip reverse complement (output exists)"
   else
-    conda_activate "$CONDA_ENV_SEQTK" seqtk
+    conda_activate "$RNAC_CONDA_ENV_SEQTK" seqtk
     log "generating reverse-complement windows"
     seqtk seq -r -l 0 "$UNIQ" > "$REVCOMP"
     sed -i '/^>/s/$/r/' "$REVCOMP"
@@ -88,7 +88,7 @@ if [ "$RUN_REVCOMP" = "1" ]; then
     || die "expected $(( n_uniq * 2 )) sequences after adding reverse complements, got $n_both"
   CLUSTER_INPUT="$BOTH"
 else
-  log "RUN_REVCOMP=0 — clustering the plus strand only"
+  log "RNAC_RUN_REVCOMP=0 — clustering the plus strand only"
   CLUSTER_INPUT="$UNIQ"
 fi
 
@@ -101,30 +101,30 @@ fi
 #      the rest of the pipeline treats as candidate RNA families.
 # Only pass 1 gets --kmer-per-seq; upstream omits it from pass 2.
 
-P1="$OUTDIR/mmseq2_covmode0_PID$(pct "$PID_PASS1")_cov$(pct "$COVERAGE")"
-P2="$OUTDIR/mmseq2_repSeqs_covmode0_PID$(pct "$PID_PASS2")_cov$(pct "$COVERAGE")"
-TMP1="$OUTDIR/tmp_covmode0_PID$(pct "$PID_PASS1")_cov$(pct "$COVERAGE")"
-TMP2="$OUTDIR/tmp_repSeqs_covmode0_PID$(pct "$PID_PASS2")_cov$(pct "$COVERAGE")"
+P1="$OUTDIR/mmseq2_covmode0_PID$(pct "$RNAC_PID_PASS1")_cov$(pct "$RNAC_COVERAGE")"
+P2="$OUTDIR/mmseq2_repSeqs_covmode0_PID$(pct "$RNAC_PID_PASS2")_cov$(pct "$RNAC_COVERAGE")"
+TMP1="$OUTDIR/tmp_covmode0_PID$(pct "$RNAC_PID_PASS1")_cov$(pct "$RNAC_COVERAGE")"
+TMP2="$OUTDIR/tmp_repSeqs_covmode0_PID$(pct "$RNAC_PID_PASS2")_cov$(pct "$RNAC_COVERAGE")"
 
-if [ -s "${P1}_rep_seq.fasta" ] && [ "$FORCE" != "1" ]; then
+if [ -s "${P1}_rep_seq.fasta" ] && [ "$RNAC_FORCE" != "1" ]; then
   log "skip mmseqs pass 1 (output exists)"
 else
-  conda_activate "$CONDA_ENV_MMSEQS" mmseqs
-  log "mmseqs pass 1: collapsing windows >= ${PID_PASS1} identical"
+  conda_activate "$RNAC_CONDA_ENV_MMSEQS" mmseqs
+  log "mmseqs pass 1: collapsing windows >= ${RNAC_PID_PASS1} identical"
   mmseqs easy-cluster "$CLUSTER_INPUT" "$P1" "$TMP1" \
-    -c "$COVERAGE" --threads "$THREADS" --kmer-per-seq "$KMER_PER_SEQ" \
-    --min-seq-id "$PID_PASS1" --cov-mode 0 --filter-hits 1
+    -c "$RNAC_COVERAGE" --threads "$RNAC_THREADS" --kmer-per-seq "$RNAC_KMER_PER_SEQ" \
+    --min-seq-id "$RNAC_PID_PASS1" --cov-mode 0 --filter-hits 1
   require_file "${P1}_rep_seq.fasta"
 fi
 
-if [ -s "${P2}_cluster.tsv" ] && [ "$FORCE" != "1" ]; then
+if [ -s "${P2}_cluster.tsv" ] && [ "$RNAC_FORCE" != "1" ]; then
   log "skip mmseqs pass 2 (output exists)"
 else
-  conda_activate "$CONDA_ENV_MMSEQS" mmseqs
-  log "mmseqs pass 2: clustering representatives at >= ${PID_PASS2} identity"
+  conda_activate "$RNAC_CONDA_ENV_MMSEQS" mmseqs
+  log "mmseqs pass 2: clustering representatives at >= ${RNAC_PID_PASS2} identity"
   mmseqs easy-cluster "${P1}_rep_seq.fasta" "$P2" "$TMP2" \
-    -c "$COVERAGE" --threads "$THREADS" \
-    --min-seq-id "$PID_PASS2" --cov-mode 0 --filter-hits 1
+    -c "$RNAC_COVERAGE" --threads "$RNAC_THREADS" \
+    --min-seq-id "$RNAC_PID_PASS2" --cov-mode 0 --filter-hits 1
   require_file "${P2}_cluster.tsv"
   require_file "${P2}_all_seqs.fasta"
 fi
@@ -144,7 +144,7 @@ fi
 
 COUNTS="$OUTDIR/cluster_count.tsv"
 
-if [ -s "$COUNTS" ] && [ "$FORCE" != "1" ]; then
+if [ -s "$COUNTS" ] && [ "$RNAC_FORCE" != "1" ]; then
   log "skip cluster_count.tsv (exists)"
 else
   cut -f1 "${P2}_cluster.tsv" | sort | uniq -dc \
@@ -160,24 +160,24 @@ n_multi=$(wc -l < "$COUNTS")
 log "clusters with >= 2 members: $n_multi"
 
 if [ "$n_multi" -eq 0 ]; then
-  warn "no multi-member clusters — every window is unique at ${PID_PASS2} identity"
+  warn "no multi-member clusters — every window is unique at ${RNAC_PID_PASS2} identity"
   warn "with few input genomes this is expected; nothing for steps 3+ to align"
 fi
 
 # --- split into per-cluster FASTAs -----------------------------------------
 
-if [ -d "$SPLITDIR" ] && [ -n "$(ls -A "$SPLITDIR" 2>/dev/null)" ] && [ "$FORCE" != "1" ]; then
+if [ -d "$SPLITDIR" ] && [ -n "$(ls -A "$SPLITDIR" 2>/dev/null)" ] && [ "$RNAC_FORCE" != "1" ]; then
   log "skip cluster splitting (splits/ already populated)"
 else
   rm -rf "$SPLITDIR"
   mkdir -p "$SPLITDIR"
 
-  case "$SPLIT_METHOD" in
+  case "$RNAC_SPLIT_METHOD" in
     repo)
       # getClusterSequences.sh hardcodes both the input filename and the output
       # location (its working directory), so the all_seqs file is copied in
-      # under the exact name it expects -- which matters if PID_PASS2 or
-      # COVERAGE were changed, since our own filename would no longer match.
+      # under the exact name it expects -- which matters if RNAC_PID_PASS2 or
+      # RNAC_COVERAGE were changed, since our own filename would no longer match.
       log "splitting $n_multi cluster(s) with upstream getClusterSequences.sh"
       require_file "$SRC/getClusterSequences.sh"
       cp "${P2}_all_seqs.fasta" \
@@ -208,7 +208,7 @@ else
       ' "$COUNTS" "${P2}_all_seqs.fasta"
       ;;
     *)
-      die "unknown SPLIT_METHOD '$SPLIT_METHOD' (expected: repo | awk)"
+      die "unknown RNAC_SPLIT_METHOD '$RNAC_SPLIT_METHOD' (expected: repo | awk)"
       ;;
   esac
 fi
@@ -241,7 +241,7 @@ done < "$COUNTS"
 
 # --- cleanup ---------------------------------------------------------------
 
-if [ "$CLEAN_MMSEQS_TMP" = "1" ]; then
+if [ "$RNAC_CLEAN_MMSEQS_TMP" = "1" ]; then
   rm -rf "$TMP1" "$TMP2"
   log "removed mmseqs tmp directories"
 fi
@@ -260,10 +260,10 @@ printf '%-42s %10s\n' STAGE SEQUENCES
 printf '%-42s %10s\n' ------------------------------------------ ----------
 printf '%-42s %10s\n' "unique windows from step 1"          "$n_in"
 printf '%-42s %10s\n' "clustering input (both strands)"     "$n_clust_in"
-printf '%-42s %10s\n' "after ${PID_PASS1} redundancy removal"   "$n_rep"
+printf '%-42s %10s\n' "after ${RNAC_PID_PASS1} redundancy removal"   "$n_rep"
 
 echo
-printf '%-42s %10s\n' "clusters at ${PID_PASS2} identity"       "$n_total"
+printf '%-42s %10s\n' "clusters at ${RNAC_PID_PASS2} identity"       "$n_total"
 printf '%-42s %10s\n' "  with >= 2 members (kept)"          "$n_multi"
 printf '%-42s %10s\n' "  singletons (dropped)"              "$(( n_total - n_multi ))"
 printf '%-42s %10s\n' "cluster FASTAs written"              "${#splits[@]}"

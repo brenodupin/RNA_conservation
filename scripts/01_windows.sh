@@ -2,19 +2,19 @@
 #
 # 01_windows.sh — slice each genome into overlapping windows, then filter.
 #
-#   in : $DATA/$STEP_00/*_oneLine.fasta
-#   out: $DATA/$STEP_01/<sample>_windows.fa            per-sample windows
-#        $DATA/$STEP_01/all_windows.fasta              combined
-#        $DATA/$STEP_01/all_windows_processed_noNs.fasta
-#        $DATA/$STEP_01/all_windows_processed_noNs_polyN.fasta
-#        $DATA/$STEP_01/all_windows_processed_noNs_polyN_uniq.fasta   <-- step 2 input
-#        $DATA/$STEP_01/all_windows_nuclComposition.tsv
-#        $DATA/$STEP_01/<sample>_nuclInfo.csv           (if RUN_COUNTNS=1)
+#   in : $RNAC_DATA/$RNAC_STEP_00/*_oneLine.fasta
+#   out: $RNAC_DATA/$RNAC_STEP_01/<sample>_windows.fa            per-sample windows
+#        $RNAC_DATA/$RNAC_STEP_01/all_windows.fasta              combined
+#        $RNAC_DATA/$RNAC_STEP_01/all_windows_processed_noNs.fasta
+#        $RNAC_DATA/$RNAC_STEP_01/all_windows_processed_noNs_polyN.fasta
+#        $RNAC_DATA/$RNAC_STEP_01/all_windows_processed_noNs_polyN_uniq.fasta   <-- step 2 input
+#        $RNAC_DATA/$RNAC_STEP_01/all_windows_nuclComposition.tsv
+#        $RNAC_DATA/$RNAC_STEP_01/<sample>_nuclInfo.csv           (if RNAC_RUN_COUNTNS=1)
 #
 #   ./01_windows.sh                        normal run
-#   FORCE=1 ./01_windows.sh                rebuild everything
-#   WINDOW=500 OVERLAP=100 ./01_windows.sh different window geometry
-#   SORT_WINDOWS=0 ./01_windows.sh         random output ordering
+#   RNAC_FORCE=1 ./01_windows.sh                rebuild everything
+#   RNAC_WINDOW=500 RNAC_OVERLAP=100 ./01_windows.sh different window geometry
+#   RNAC_SORT_WINDOWS=0 ./01_windows.sh         random output ordering
 
 set -euo pipefail
 
@@ -24,13 +24,13 @@ source "$HERE/info.sh"
 # shellcheck source=common.sh
 source "$HERE/common.sh"
 
-STEP="$STEP_01"
-INDIR="$DATA/$STEP_00"
-OUTDIR="$DATA/$STEP"
-SRC="$REPO/step1_createWindows"
+STEP="$RNAC_STEP_01"
+INDIR="$RNAC_DATA/$RNAC_STEP_00"
+OUTDIR="$RNAC_DATA/$STEP"
+SRC="$RNAC_REPO/step1_createWindows"
 
 start_log "$STEP"
-log "window=$WINDOW overlap=$OVERLAP stride=$(( WINDOW - OVERLAP ))  force=$FORCE"
+log "window=$RNAC_WINDOW overlap=$RNAC_OVERLAP stride=$(( RNAC_WINDOW - RNAC_OVERLAP ))  force=$RNAC_FORCE"
 
 require_cmd perl
 require_dir "$INDIR"
@@ -41,8 +41,8 @@ mkdir -p "$OUTDIR"
 
 # --- validate geometry -----------------------------------------------------
 #
-# createWindows.pl advances with  repos += WINDOW - OVERLAP  while testing
-# (repos + WINDOW) < size. If OVERLAP >= WINDOW the stride is zero or negative,
+# createWindows.pl advances with  repos += RNAC_WINDOW - RNAC_OVERLAP  while testing
+# (repos + RNAC_WINDOW) < size. If RNAC_OVERLAP >= RNAC_WINDOW the stride is zero or negative,
 # repos never moves, and the loop writes the same window forever until the disk
 # fills. It has no guard of its own, so check here.
 #
@@ -50,11 +50,11 @@ mkdir -p "$OUTDIR"
 # dies with a confusing perl error rather than printing usage. All the more
 # reason to validate before invoking it.
 
-[[ "$WINDOW"  =~ ^[0-9]+$ ]] || die "WINDOW must be a positive integer (got '$WINDOW')"
-[[ "$OVERLAP" =~ ^[0-9]+$ ]] || die "OVERLAP must be a non-negative integer (got '$OVERLAP')"
-[ "$WINDOW" -gt 0 ] || die "WINDOW must be > 0"
-[ "$OVERLAP" -lt "$WINDOW" ] \
-  || die "OVERLAP ($OVERLAP) must be < WINDOW ($WINDOW): stride would be <= 0 and createWindows.pl would loop forever"
+[[ "$RNAC_WINDOW"  =~ ^[0-9]+$ ]] || die "RNAC_WINDOW must be a positive integer (got '$RNAC_WINDOW')"
+[[ "$RNAC_OVERLAP" =~ ^[0-9]+$ ]] || die "RNAC_OVERLAP must be a non-negative integer (got '$RNAC_OVERLAP')"
+[ "$RNAC_WINDOW" -gt 0 ] || die "RNAC_WINDOW must be > 0"
+[ "$RNAC_OVERLAP" -lt "$RNAC_WINDOW" ] \
+  || die "RNAC_OVERLAP ($RNAC_OVERLAP) must be < RNAC_WINDOW ($RNAC_WINDOW): stride would be <= 0 and createWindows.pl would loop forever"
 
 # --- collect inputs --------------------------------------------------------
 
@@ -79,16 +79,16 @@ for f in "${inputs[@]}"; do
   b=$(basename "$f" _oneLine.fasta)
   out="$OUTDIR/${b}_windows.fa"
 
-  if [ -s "$out" ] && [ "$FORCE" != "1" ]; then
-    log "skip $b (windows exist; FORCE=1 to rebuild)"
+  if [ -s "$out" ] && [ "$RNAC_FORCE" != "1" ]; then
+    log "skip $b (windows exist; RNAC_FORCE=1 to rebuild)"
     continue
   fi
 
-  log "windowing $b (w=$WINDOW p=$OVERLAP)"
+  log "windowing $b (w=$RNAC_WINDOW p=$RNAC_OVERLAP)"
   rm -f "$out"
-  perl "$SRC/createWindows.pl" -f "$f" -w "$WINDOW" -p "$OVERLAP" -O "$out"
+  perl "$SRC/createWindows.pl" -f "$f" -w "$RNAC_WINDOW" -p "$RNAC_OVERLAP" -O "$out"
 
-  [ -s "$out" ] || die "createWindows.pl produced no output for $b (is the genome shorter than WINDOW=$WINDOW?)"
+  [ -s "$out" ] || die "createWindows.pl produced no output for $b (is the genome shorter than RNAC_WINDOW=$RNAC_WINDOW?)"
 done
 
 # --- combine ---------------------------------------------------------------
@@ -96,10 +96,10 @@ done
 # Concatenated in the sorted sample order above rather than by re-globbing, so
 # the combined file is reproducible across runs and machines.
 
-COMBINED="$OUTDIR/${WINDOWS_PREFIX}.fasta"
+COMBINED="$OUTDIR/${RNAC_WINDOWS_PREFIX}.fasta"
 
-if [ -s "$COMBINED" ] && [ "$FORCE" != "1" ]; then
-  log "skip combine (${WINDOWS_PREFIX}.fasta exists)"
+if [ -s "$COMBINED" ] && [ "$RNAC_FORCE" != "1" ]; then
+  log "skip combine (${RNAC_WINDOWS_PREFIX}.fasta exists)"
 else
   log "combining ${#inputs[@]} window file(s) -> $(basename "$COMBINED")"
   : > "$COMBINED"
@@ -122,13 +122,13 @@ assert_oneline_fasta "$COMBINED"
 # and writes <prefix>_uniq.fasta. Passing a filename makes it look for
 # "....fasta.fasta", open nothing, and silently emit an empty result.
 
-FILT_PREFIX="$OUTDIR/${WINDOWS_PREFIX}_processed"
+FILT_PREFIX="$OUTDIR/${RNAC_WINDOWS_PREFIX}_processed"
 NONS="${FILT_PREFIX}_noNs.fasta"
 POLYN="${FILT_PREFIX}_noNs_polyN.fasta"
 UNIQ="${FILT_PREFIX}_noNs_polyN_uniq.fasta"
-COMPOSITION="$OUTDIR/${WINDOWS_PREFIX}_nuclComposition.tsv"
+COMPOSITION="$OUTDIR/${RNAC_WINDOWS_PREFIX}_nuclComposition.tsv"
 
-if [ -s "$POLYN" ] && [ "$FORCE" != "1" ]; then
+if [ -s "$POLYN" ] && [ "$RNAC_FORCE" != "1" ]; then
   log "skip N/poly-N filter (output exists)"
 else
   log "removing windows containing N and poly-A/T/G/C windows"
@@ -137,7 +137,7 @@ else
   require_file "$POLYN"
 fi
 
-if [ -s "$UNIQ" ] && [ "$FORCE" != "1" ]; then
+if [ -s "$UNIQ" ] && [ "$RNAC_FORCE" != "1" ]; then
   log "skip deduplication (output exists)"
 else
   log "removing duplicate window sequences"
@@ -152,9 +152,9 @@ fi
 # process, so reruns produce the same records in a different order. That is
 # harmless for correctness but makes byte-level diffing useless, and mmseqs2 in
 # step 2 can pick different cluster representatives from a different input
-# order. Set SORT_WINDOWS=1 to sort by header and make runs reproducible.
+# order. Set RNAC_SORT_WINDOWS=1 to sort by header and make runs reproducible.
 
-if [ "$SORT_WINDOWS" = "1" ]; then
+if [ "$RNAC_SORT_WINDOWS" = "1" ]; then
   log "sorting filtered outputs by header for reproducibility"
   for target in "$NONS" "$POLYN" "$UNIQ"; do
     [ -s "$target" ] || continue
@@ -173,11 +173,11 @@ done
 # It counts anything outside AUTGCautgc, so ambiguity codes (R, Y, W...) are
 # included in the N count, not just literal N.
 
-if [ "$RUN_COUNTNS" = "1" ]; then
+if [ "$RNAC_RUN_COUNTNS" = "1" ]; then
   for f in "${inputs[@]}"; do
     b=$(basename "$f" _oneLine.fasta)
     csv="$OUTDIR/${b}_nuclInfo.csv"
-    if [ -s "$csv" ] && [ "$FORCE" != "1" ]; then continue; fi
+    if [ -s "$csv" ] && [ "$RNAC_FORCE" != "1" ]; then continue; fi
     perl "$SRC/countNs.pl" "$f" > "$csv"
   done
   log "per-genome N content written to <sample>_nuclInfo.csv"

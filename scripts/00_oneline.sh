@@ -2,16 +2,16 @@
 #
 # 00_oneline.sh — convert every input FASTA to strict one-line format.
 #
-#   in :  $INPUT/*.{fasta,fa,fna}
-#   out:  $DATA/$STEP_00/<sample>_oneLine.fasta
+#   in :  $RNAC_INPUT/*.{fasta,fa,fna}
+#   out:  $RNAC_DATA/$RNAC_STEP_00/<sample>_oneLine.fasta
 #
 # Every downstream perl script in this pipeline reads FASTA as header/sequence
 # LINE PAIRS. Multi-line input does not error, it just produces silent garbage,
 # so this step is mandatory and validates its own output.
 #
 #   ./00_oneline.sh                      normal run
-#   FORCE=1 ./00_oneline.sh              rebuild existing outputs
-#   ONELINE_METHOD=repo ./00_oneline.sh  use upstream fasta_oneLiner.sh instead
+#   RNAC_FORCE=1 ./00_oneline.sh              rebuild existing outputs
+#   RNAC_ONELINE_METHOD=repo ./00_oneline.sh  use upstream fasta_oneLiner.sh instead
 
 set -euo pipefail
 
@@ -21,24 +21,24 @@ source "$HERE/info.sh"
 # shellcheck source=common.sh
 source "$HERE/common.sh"
 
-STEP="$STEP_00"
-OUTDIR="$DATA/$STEP"
+STEP="$RNAC_STEP_00"
+OUTDIR="$RNAC_DATA/$STEP"
 
 start_log "$STEP"
-log "REPO=$REPO"
-log "INPUT=$INPUT"
-log "method=$ONELINE_METHOD  force=$FORCE"
+log "RNAC_REPO=$RNAC_REPO"
+log "RNAC_INPUT=$RNAC_INPUT"
+log "method=$RNAC_ONELINE_METHOD  force=$RNAC_FORCE"
 
-require_dir "$INPUT"
+require_dir "$RNAC_INPUT"
 mkdir -p "$OUTDIR"
 
 # --- collect inputs --------------------------------------------------------
 
 shopt -s nullglob
-inputs=( "$INPUT"/*.fasta "$INPUT"/*.fa "$INPUT"/*.fna )
+inputs=( "$RNAC_INPUT"/*.fasta "$RNAC_INPUT"/*.fa "$RNAC_INPUT"/*.fna )
 shopt -u nullglob
 
-[ ${#inputs[@]} -gt 0 ] || die "no .fasta/.fa/.fna files found in $INPUT"
+[ ${#inputs[@]} -gt 0 ] || die "no .fasta/.fa/.fna files found in $RNAC_INPUT"
 log "found ${#inputs[@]} input file(s)"
 
 # Upstream derives the sample name with  basename | cut -d. -f1  so
@@ -62,14 +62,14 @@ for f in "${inputs[@]}"; do
   b=$(basename "$f" | cut -d. -f1)
   out="$OUTDIR/${b}_oneLine.fasta"
 
-  if [ -s "$out" ] && [ "$FORCE" != "1" ]; then
-    log "skip $b (output exists; FORCE=1 to rebuild)"
+  if [ -s "$out" ] && [ "$RNAC_FORCE" != "1" ]; then
+    log "skip $b (output exists; RNAC_FORCE=1 to rebuild)"
     skipped=$((skipped + 1))
   else
     log "converting $(basename "$f") -> $(basename "$out")"
     rm -f "$out"
 
-    case "$ONELINE_METHOD" in
+    case "$RNAC_ONELINE_METHOD" in
       awk)
         # Strips all whitespace inside sequences and emits a final record even
         # when the input lacks a trailing newline (upstream's `while read` loop
@@ -83,10 +83,10 @@ for f in "${inputs[@]}"; do
       repo)
         # Upstream writes to the current directory, so run it from OUTDIR.
         ( cd "$OUTDIR" \
-          && bash "$REPO/step0_convertInputSequencesToReqFASTAformat/fasta_oneLiner.sh" "$f" )
+          && bash "$RNAC_REPO/step0_convertInputSequencesToReqFASTAformat/fasta_oneLiner.sh" "$f" )
         ;;
       *)
-        die "unknown ONELINE_METHOD '$ONELINE_METHOD' (expected: awk | repo)"
+        die "unknown RNAC_ONELINE_METHOD '$RNAC_ONELINE_METHOD' (expected: awk | repo)"
         ;;
     esac
 
@@ -105,7 +105,7 @@ for f in "${inputs[@]}"; do
   in_bp=$(grep -v '^>' "$f" | tr -d '[:space:]' | wc -c)
   out_bp=$(seq_length "$out")
   if [ "$in_bp" -ne "$out_bp" ]; then
-    die "$b lost sequence during conversion: input $in_bp bp, output $out_bp bp"$'\n'"       (ONELINE_METHOD=repo truncates files with no trailing newline; use awk)"
+    die "$b lost sequence during conversion: input $in_bp bp, output $out_bp bp"$'\n'"       (RNAC_ONELINE_METHOD=repo truncates files with no trailing newline; use awk)"
   fi
 done
 

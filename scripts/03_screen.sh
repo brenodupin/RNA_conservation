@@ -3,17 +3,17 @@
 # 03_screen.sh — align each cluster with clustal omega, then screen for
 #                consensus secondary structure with RNALalifold.
 #
-#   in : $DATA/$STEP_02/splits/<rep>_cluster.fasta
-#        $DATA/$STEP_02/cluster_count.tsv
-#   out: $DATA/$STEP_03/<rep>/<rep>_cluster.fasta
-#        $DATA/$STEP_03/<rep>/<rep>_aligned.aln          clustalo, clustal format
-#        $DATA/$STEP_03/<rep>/<rep>_distMat.csv          percent identity matrix
-#        $DATA/$STEP_03/<rep>/<rep>_RNALalifold.out      dot-bracket structures
-#        $DATA/$STEP_03/RNALalifold_passedList.txt       clusters worth folding
+#   in : $RNAC_DATA/$RNAC_STEP_02/splits/<rep>_cluster.fasta
+#        $RNAC_DATA/$RNAC_STEP_02/cluster_count.tsv
+#   out: $RNAC_DATA/$RNAC_STEP_03/<rep>/<rep>_cluster.fasta
+#        $RNAC_DATA/$RNAC_STEP_03/<rep>/<rep>_aligned.aln          clustalo, clustal format
+#        $RNAC_DATA/$RNAC_STEP_03/<rep>/<rep>_distMat.csv          percent identity matrix
+#        $RNAC_DATA/$RNAC_STEP_03/<rep>/<rep>_RNALalifold.out      dot-bracket structures
+#        $RNAC_DATA/$RNAC_STEP_03/RNALalifold_passedList.txt       clusters worth folding
 #
 #   ./03_screen.sh                    normal run
-#   FORCE=1 ./03_screen.sh            realign and refold everything
-#   FOLD_TEMP=37 ./03_screen.sh       fold at 37 C instead of 21 C
+#   RNAC_FORCE=1 ./03_screen.sh            realign and refold everything
+#   RNAC_FOLD_TEMP=37 ./03_screen.sh       fold at 37 C instead of 21 C
 #
 # clustal omega runs on the host (it is NOT in the container); RNALalifold comes
 # from the ViennaRNA package inside the container.
@@ -26,11 +26,11 @@ source "$HERE/info.sh"
 # shellcheck source=common.sh
 source "$HERE/common.sh"
 
-STEP="$STEP_03"
-INDIR="$DATA/$STEP_02"
+STEP="$RNAC_STEP_03"
+INDIR="$RNAC_DATA/$RNAC_STEP_02"
 SPLITDIR="$INDIR/splits"
 COUNTS="$INDIR/cluster_count.tsv"
-OUTDIR="$DATA/$STEP"
+OUTDIR="$RNAC_DATA/$STEP"
 
 start_log "$STEP"
 
@@ -40,7 +40,7 @@ require_cmd clustalo
 docker_preflight
 mkdir -p "$OUTDIR"
 
-log "fold temperature: ${FOLD_TEMP} C"
+log "fold temperature: ${RNAC_FOLD_TEMP} C"
 
 # Upstream reads the cluster name from column 2 of cluster_count.tsv with
 # `cut -f2`, which is the same tab dependency step 2 guards against.
@@ -55,7 +55,7 @@ log "$total cluster(s) to screen"
 # --full and --distmat-out.
 #
 # clustalo refuses to overwrite an existing output file and exits non-zero, so
-# on FORCE=1 the previous outputs are removed rather than passing --force. That
+# on RNAC_FORCE=1 the previous outputs are removed rather than passing --force. That
 # keeps the invocation identical to upstream's.
 
 aligned=0 skipped_aln=0 missing=0
@@ -73,7 +73,7 @@ for name in "${clusters[@]}"; do
     continue
   fi
 
-  if [ -s "$aln" ] && [ "$FORCE" != "1" ]; then
+  if [ -s "$aln" ] && [ "$RNAC_FORCE" != "1" ]; then
     skipped_aln=$(( skipped_aln + 1 ))
     continue
   fi
@@ -115,15 +115,15 @@ for name in "${clusters[@]}"; do
 
   [ -s "$aln" ] || continue
 
-  if [ -s "$out" ] && [ "$FORCE" != "1" ]; then
+  if [ -s "$out" ] && [ "$RNAC_FORCE" != "1" ]; then
     skipped_fold=$(( skipped_fold + 1 ))
     continue
   fi
 
   log "[$i/$total] RNALalifold: $name"
   docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
-    -v "$dir":/work -w /work "$IMAGE" \
-    RNALalifold -T "$FOLD_TEMP" --noLP "${name}_aligned.aln" \
+    -v "$dir":/work -w /work "$RNAC_IMAGE" \
+    RNALalifold -T "$RNAC_FOLD_TEMP" --noLP "${name}_aligned.aln" \
     > "$out"
 
   folded=$(( folded + 1 ))
@@ -146,7 +146,7 @@ log "RNALalifold: $folded new, $skipped_fold reused"
 # and no "((" . In practice --noLP already forbids lone pairs, so any structure
 # RNALalifold reports here will contain a stack.
 
-PASSED="$OUTDIR/$PASSED_LIST"
+PASSED="$OUTDIR/$RNAC_PASSED_LIST"
 
 shopt -s nullglob
 outs=( "$OUTDIR"/*/*_RNALalifold.out )
