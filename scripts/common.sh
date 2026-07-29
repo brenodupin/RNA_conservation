@@ -65,6 +65,14 @@ start_log() {
 
 _close_log() {
   local rc=$?
+  # Stop a background progress monitor if a step started one, so an interrupted
+  # run never leaves an orphan polling loop behind.
+  if [ -n "${_PROGRESS_PID:-}" ]; then
+    pkill -P "$_PROGRESS_PID" 2>/dev/null || true
+    kill "$_PROGRESS_PID" 2>/dev/null || true
+    wait "$_PROGRESS_PID" 2>/dev/null || true
+    _PROGRESS_PID=""
+  fi
   if [ "$rc" -eq 0 ]; then
     log "===== $LOGSTEP finished OK ====="
   else
