@@ -95,6 +95,32 @@
 : "${PID_PASS2:=0.50}"
 : "${COVERAGE:=0.80}"
 
+# --kmer-per-seq is passed to the first mmseqs pass only. The upstream README
+# omits it from the second command, so we do too.
+: "${KMER_PER_SEQ:=200}"
+
+# Step 2: generate reverse-complement windows before clustering. RNA folding
+# only considers the strand it is given. Set to 0 when the input is already
+# strand-specific (e.g. UTRs of coding genes) -- upstream marks this optional.
+: "${RUN_REVCOMP:=1}"
+
+# Step 2 cluster splitting backend:
+#   repo - upstream getClusterSequences.sh          (default)
+#   awk  - single-pass equivalent, far faster at scale
+# The upstream script re-scans the whole _all_seqs.fasta once per cluster, so
+# its cost is O(clusters x filesize); with thousands of clusters that dominates
+# the step. Both produce byte-identical output.
+: "${SPLIT_METHOD:=repo}"
+
+# Remove mmseqs2 tmp directories when the step completes (they are large).
+: "${CLEAN_MMSEQS_TMP:=1}"
+
+# Conda environments, assumed to already exist (created from the .yml files in
+# step2_clustering/). Each step activates what it needs and verifies the tool is
+# present before running anything.
+: "${CONDA_ENV_SEQTK:=seqtk_env}"
+: "${CONDA_ENV_MMSEQS:=mmseq2env}"
+
 : "${THREADS:=8}"
 
 # ---------------------------------------------------------------------------

@@ -64,6 +64,53 @@ _close_log() {
   exec 1>&3 2>&4 3>&- 4>&-              # restore; tee flushes and exits
 }
 
+# --- conda ------------------------------------------------------------------
+#
+# conda_activate <env> [required_cmd ...]
+#
+# `conda activate` is a shell function, not an executable, and it is undefined
+# in a non-interactive script until conda's hook is evaluated -- without it you
+# get "CommandNotFoundError: Your shell has not been properly configured".
+# Conda's own scripts also reference unset variables, so `set -u` is relaxed
+# around them.
+#
+# The resulting PATH change persists for the remainder of the script and is
+# inherited by every command it runs. It does NOT persist if this is called
+# from inside ( ) or $( ), so call it at the top level of a step.
+conda_activate() {
+  local env=$1; shift
+
+  command -v conda >/dev/null 2>&1 \
+    || die "conda not on PATH — needed to activate '$env'"
+
+  set +u
+  if [ -z "${_CONDA_HOOKED:-}" ]; then
+    eval "$(conda shell.bash hook)"
+    _CONDA_HOOKED=1
+  fi
+  set -u
+
+  conda env list | awk '{print $1}' | grep -qx -- "$env" \
+    || die "conda env '$env' does not exist — create it with: conda env create -f $REPO/step2_clustering/${env}*.yml"
+
+  set +u
+  if ! conda activate "$env"; then set -u; die "failed to activate conda env '$env'"; fi
+  set -u
+  log "conda env active: $env"
+
+  local c
+  for c in "$@"; do
+    command -v "$c" >/dev/null 2>&1 \
+      || die "'$c' not found in conda env '$env'"
+  done
+}
+
+conda_deactivate() {
+  set +u
+  conda deactivate 2>/dev/null || true
+  set -u
+}
+
 # --- FASTA validation ------------------------------------------------------
 
 # ensure_trailing_newline <file>
