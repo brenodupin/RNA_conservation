@@ -90,6 +90,10 @@
 # in the original study; change this for your organism.
 : "${FOLD_TEMP:=21}"
 
+# Name of the list of clusters that passed RNALalifold screening. Written by
+# step 3, read by step 4.
+: "${PASSED_LIST:=RNALalifold_passedList.txt}"
+
 # Step 2 clustering identity thresholds (two-pass).
 : "${PID_PASS1:=0.95}"
 : "${PID_PASS2:=0.50}"

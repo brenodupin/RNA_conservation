@@ -111,6 +111,20 @@ conda_deactivate() {
   set -u
 }
 
+# --- docker -----------------------------------------------------------------
+#
+# Checked once per step, before any long loop, so a missing image or a
+# permission problem fails immediately rather than after the first cluster.
+docker_preflight() {
+  command -v docker >/dev/null 2>&1 \
+    || die "docker not on PATH"
+  docker info >/dev/null 2>&1 \
+    || die "cannot reach the docker daemon. If this is a permission error: sudo usermod -aG docker \$USER, then log out and back in"
+  docker image inspect "$IMAGE" >/dev/null 2>&1 \
+    || die "image '$IMAGE' not present locally — run: docker pull $IMAGE"
+  log "docker image: $IMAGE"
+}
+
 # --- FASTA validation ------------------------------------------------------
 
 # ensure_trailing_newline <file>
