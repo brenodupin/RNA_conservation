@@ -1,3 +1,11 @@
+This if a fork of the project [RNA_conservation](https://github.com/RodrigoReisLab/RNA_conservation) from [Rodrigo Reis Lab](https://www.rodrigoreislab.com/).
+
+The goal of this fork is to convert the HPC scripts to run on a local machine.
+
+[Claude](https://claude.ai) (mainly Opus 5, Medium) is being used extensively in this effort, use it with caution.
+
+Original README follows:
+
 # **Genome-wide discovery of conserved RNA secondary structures**
 -----------------------------------------------------------------
 
