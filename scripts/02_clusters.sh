@@ -166,9 +166,22 @@ fi
 
 # --- split into per-cluster FASTAs -----------------------------------------
 
-if [ -d "$SPLITDIR" ] && [ -n "$(ls -A "$SPLITDIR" 2>/dev/null)" ] && [ "$RNAC_FORCE" != "1" ]; then
-  log "skip cluster splitting (splits/ already populated)"
+count_splits() {
+  find "$SPLITDIR" -maxdepth 1 -type f -name '*_cluster.fasta' 2>/dev/null | wc -l
+}
+
+n_have=0
+[ -d "$SPLITDIR" ] && n_have=$(count_splits)
+
+# Completeness is a count comparison, not "is the directory non-empty". An
+# interrupted split leaves a populated directory that looks finished, and
+# skipping it then fails verification thousands of clusters later.
+if [ "$n_multi" -gt 0 ] && [ "$n_have" -eq "$n_multi" ] && [ "$RNAC_FORCE" != "1" ]; then
+  log "skip cluster splitting ($n_have/$n_multi already present)"
 else
+  if [ "$n_have" -gt 0 ]; then
+    log "splits/ holds $n_have of $n_multi expected files — rebuilding from scratch"
+  fi
   rm -rf "$SPLITDIR"
   mkdir -p "$SPLITDIR"
 
@@ -214,30 +227,37 @@ else
 fi
 
 # --- verify the splits -----------------------------------------------------
+#
+# All three checks are single-pass. The previous version ran one grep per
+# cluster, which cost ~1 minute at 44k clusters and ran on every invocation,
+# including ones that skipped the split entirely.
 
-shopt -s nullglob
-splits=( "$SPLITDIR"/*_cluster.fasta )
-shopt -u nullglob
+n_have=$(count_splits)
+[ "$n_have" -eq "$n_multi" ] \
+  || die "wrote $n_have cluster FASTAs but expected $n_multi"
 
-[ ${#splits[@]} -eq "$n_multi" ] \
-  || warn "wrote ${#splits[@]} cluster FASTAs but expected $n_multi"
+# Empty-but-present files are the classic symptom of cluster_count.tsv losing
+# its tabs, since getClusterSequences.sh then reads an empty cluster name.
+n_empty=$(find "$SPLITDIR" -maxdepth 1 -type f -name '*_cluster.fasta' -empty | wc -l)
+[ "$n_empty" -eq 0 ] \
+  || die "$n_empty cluster FASTA(s) are empty — check that cluster_count.tsv is tab-separated"
 
-# The classic symptom of the tab bug is files that exist but are empty, so
-# check contents rather than just presence.
-empty=0
-mismatch=0
-while IFS=$'\t' read -r want name; do
-  f="$SPLITDIR/${name}_cluster.fasta"
-  if [ ! -s "$f" ]; then
-    empty=$(( empty + 1 ))
-    continue
-  fi
-  got=$(grep -c '^>' "$f")
-  [ "$got" -eq "$want" ] || mismatch=$(( mismatch + 1 ))
-done < "$COUNTS"
-
-[ "$empty" -eq 0 ] || die "$empty cluster FASTA(s) are empty or missing"
-[ "$mismatch" -eq 0 ] || warn "$mismatch cluster(s) have a different member count than cluster_count.tsv"
+# Member counts, in one grep pass over every file rather than one grep each.
+# -H forces the filename prefix even when xargs hands grep a single file.
+if [ "$n_have" -gt 0 ]; then
+  mismatch=$(
+    find "$SPLITDIR" -maxdepth 1 -type f -name '*_cluster.fasta' -print0 \
+      | xargs -0 grep -cH '^>' \
+      | sed 's/_cluster\.fasta:/\t/' \
+      | awk -F'\t' '
+          NR==FNR { want[$2] = $1; next }
+          { name = $1; sub(/^.*\//, "", name); if (want[name] != $2) n++ }
+          END { print n+0 }
+        ' "$COUNTS" -
+  )
+  [ "$mismatch" -eq 0 ] \
+    || warn "$mismatch cluster(s) have a member count differing from cluster_count.tsv"
+fi
 
 # --- cleanup ---------------------------------------------------------------
 
@@ -266,12 +286,41 @@ echo
 printf '%-42s %10s\n' "clusters at ${RNAC_PID_PASS2} identity"       "$n_total"
 printf '%-42s %10s\n' "  with >= 2 members (kept)"          "$n_multi"
 printf '%-42s %10s\n' "  singletons (dropped)"              "$(( n_total - n_multi ))"
-printf '%-42s %10s\n' "cluster FASTAs written"              "${#splits[@]}"
+printf '%-42s %10s\n' "cluster FASTAs written"              "$n_have"
 
 echo
-if [ "${#splits[@]}" -gt 0 ]; then
-  biggest=$(sort -k1,1nr "$COUNTS" | head -1)
-  log "largest cluster: $(echo "$biggest" | cut -f2) ($(echo "$biggest" | cut -f1) members)"
+if [ "$n_have" -gt 0 ]; then
+  # A `sort | head -1` here dies with SIGPIPE (exit 141) once cluster_count.tsv
+  # is large enough that sort is still writing when head closes the pipe --
+  # which pipefail then propagates and set -e turns into a failed step. One awk
+  # pass has no pipe to break, and is O(n) rather than O(n log n).
+  #
+  # The size buckets matter for planning: RNA-SCoRE ranks an alignment High at
+  # >=10 sequences and Mid at 7-9, so clusters below 7 cannot produce a usable
+  # result no matter how much time step 3 and step 4 spend on them.
+  awk -F'\t' '
+    { n = $1
+      if (n > max) { max = n; maxname = $2 }
+      total++
+      if (n == 2)      b2++
+      else if (n <= 4) b34++
+      else if (n <= 6) b56++
+      else if (n <= 9) b79++
+      else             b10++
+    }
+    END {
+      printf "%-42s %10s\n", "largest cluster", max " (" maxname ")"
+      printf "\n%-42s %10s %9s\n", "CLUSTER SIZE", "COUNT", "SHARE"
+      printf "%-42s %10s %9s\n", "------------------------------------------", "----------", "---------"
+      printf "%-42s %10d %8.1f%%\n", "2 members",              b2+0,  100*(b2+0)/total
+      printf "%-42s %10d %8.1f%%\n", "3-4 members",            b34+0, 100*(b34+0)/total
+      printf "%-42s %10d %8.1f%%\n", "5-6 members",            b56+0, 100*(b56+0)/total
+      printf "%-42s %10d %8.1f%%\n", "7-9 members (RNA-SCoRE Mid)",  b79+0, 100*(b79+0)/total
+      printf "%-42s %10d %8.1f%%\n", ">=10 members (RNA-SCoRE High)", b10+0, 100*(b10+0)/total
+      printf "\n%-42s %10d\n", "usable for a Mid/High rank (>=7)", (b79+0)+(b10+0)
+    }
+  ' "$COUNTS"
 fi
+echo
 log "step 3 input: $SPLITDIR/*_cluster.fasta"
 log "outputs in $OUTDIR"
