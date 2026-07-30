@@ -139,6 +139,48 @@ unset _repo_from_env
 # every other worker idle waiting for it. Order does not affect results.
 : "${RNAC_LOCARNA_ORDER:=size}"
 
+# ---------------------------------------------------------------------------
+# Step 5 — evaluation (trim / RNA-SCoRE / R-scape)
+# ---------------------------------------------------------------------------
+
+# RNA-SCoRE.pl thresholds. These are upstream's values from
+# submit_evalStruct_v3_job.sh, passed explicitly on every call -- the script
+# prints "threshold not provided, using default" to STDOUT when one is omitted,
+# and STDOUT is where the High/Mid/Low rank line also goes, so a missing flag
+# would contaminate the rank capture. Always pass all four.
+#
+#   MT  motif threshold          fraction of the motif's base-pairs a sequence
+#                                must form overall                        [0-1]
+#   BP  per-stem bp threshold    fraction each individual stem must form   [0-1]
+#   GC  GC/CG bp threshold       fraction of a stem's bps that must be G:C/C:G
+#   DUPL 0 = drop duplicate sequences, 1 = keep them
+: "${RNAC_SCORE_MT:=0.5}"
+: "${RNAC_SCORE_BP:=0.75}"
+: "${RNAC_SCORE_GC:=0.30}"
+: "${RNAC_SCORE_DUPL:=0}"
+
+# A cluster is promoted to the R-scape phase when RNA-SCoRE ranks it at or above
+# this level. High = >=10 passed sequences, Mid = 7-9, Low = <7. Upstream takes
+# High and Mid forward; Low is dropped. Set to High to be stricter.
+#   allowed: High | Mid       (Low would take everything and is not meaningful)
+: "${RNAC_SCORE_MIN_RANK:=Mid}"
+
+# R-scape covariation test. -s is the two-tailed test; --cacofold adds the
+# constraint-folded structure for the visual comparison in the README. Seed is
+# fixed so reruns are byte-reproducible.
+: "${RNAC_RSCAPE_SEED:=42}"
+
+# Label baked into R-scape's output directory and file names, e.g.
+#   <cluster>_<label>_rscape_out/<cluster>_<label>_rscape.cacofold.sto
+# Upstream used "gc15_twoTest" / "gc15"; step 6 reads files under that scheme,
+# so keep it aligned with whatever step 6 expects if you change it.
+: "${RNAC_RSCAPE_LABEL:=gc15}"
+
+# Also emit <cluster>_motif.aln (clustal) via esl-reformat during the trim
+# phase. Upstream produces it; nothing in this repo consumes it yet, but step 6
+# is iterative and may. Cheap (runs in the container). Set 0 to skip.
+: "${RNAC_TRIM_MAKE_ALN:=1}"
+
 
 # ---------------------------------------------------------------------------
 # Behaviour
