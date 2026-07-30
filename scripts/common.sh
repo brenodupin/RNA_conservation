@@ -82,6 +82,34 @@ _close_log() {
   exec 1>&3 2>&4 3>&- 4>&-              # restore; tee flushes and exits
 }
 
+# progress_start <label> <target> <find-args...>
+# Polls the filesystem so a long parallel phase is not silent.
+#
+# The loop sleeps in short increments rather than one long `sleep`. Killing the
+# subshell does not kill a `sleep` it already spawned, and that orphan keeps the
+# inherited stdout pipe open -- which blocks `tee`, and so blocks the whole
+# script from exiting, for the remainder of the sleep.
+progress_start() {
+  local label=$1 target=$2; shift 2
+  local args=( "$@" )
+  ( local n=0
+    while :; do
+      sleep 2
+      n=$(( n + 1 ))
+      [ $(( n % 15 )) -eq 0 ] || continue
+      log "$label: $(find "${args[@]}" 2>/dev/null | wc -l)/$target"
+    done ) &
+  _PROGRESS_PID=$!
+}
+
+progress_stop() {
+  [ -n "${_PROGRESS_PID:-}" ] || return 0
+  pkill -P "$_PROGRESS_PID" 2>/dev/null || true
+  kill "$_PROGRESS_PID" 2>/dev/null || true
+  wait "$_PROGRESS_PID" 2>/dev/null || true
+  _PROGRESS_PID=""
+}
+
 # --- conda ------------------------------------------------------------------
 #
 # conda_activate <env> [required_cmd ...]

@@ -107,6 +107,15 @@ unset _repo_from_env
 
 : "${RNAC_THREADS:=8}"
 
+# Clusters processed concurrently in step 3 (and later per-cluster steps).
+# The work is independent per cluster and dominated by container startup rather
+# than compute, so this scales close to linearly until the docker daemon or the
+# filesystem saturates. With ~44k clusters the difference is hours.
+#
+# Distinct from RNAC_THREADS, which is threads *within* one mmseqs invocation.
+: "${RNAC_JOBS:=4}"
+
+
 # ---------------------------------------------------------------------------
 # Behaviour
 # ---------------------------------------------------------------------------
