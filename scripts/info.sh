@@ -115,6 +115,30 @@ unset _repo_from_env
 # Distinct from RNAC_THREADS, which is threads *within* one mmseqs invocation.
 : "${RNAC_JOBS:=4}"
 
+# Step 4 threads *inside* one mlocarna run. 3 is upstream's value. Total core
+# usage is RNAC_JOBS x this, and 04_locarna.sh warns if that exceeds nproc.
+#
+# mlocarna parallelises the pairwise-probability phase and little else, so
+# threads beyond ~4 buy progressively less; with thousands of clusters to get
+# through, more concurrent clusters (RNAC_JOBS) beats more threads each.
+: "${RNAC_LOCARNA_THREADS:=3}"
+
+# Memory cap per step 4 container, e.g. 4g. Empty = uncapped (default).
+#
+# Upstream reserved 12G per CPU on the cluster, and mlocarna's footprint grows
+# with members x length, so a cap tight enough to matter gets the container
+# OOM-killed part way through a cluster that would otherwise have finished. Set
+# this only to protect a shared machine; worker_step_04.sh flags exit 137 as the
+# likely cause when it is in effect.
+: "${RNAC_LOCARNA_MEM:=}"
+
+# Step 4 scheduling order:
+#   size - largest cluster first, from cluster_count.tsv   (default)
+#   list - the order of RNALalifold_passedList.txt         (upstream)
+# Runtimes span orders of magnitude, so a large cluster started last leaves
+# every other worker idle waiting for it. Order does not affect results.
+: "${RNAC_LOCARNA_ORDER:=size}"
+
 
 # ---------------------------------------------------------------------------
 # Behaviour
