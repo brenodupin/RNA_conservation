@@ -57,6 +57,8 @@ mkdir -p "$OUTDIR"
   || die "RNAC_JOBS must be a positive integer (got '$RNAC_JOBS')"
 [[ "$RNAC_LOCARNA_THREADS" =~ ^[0-9]+$ ]] && [ "$RNAC_LOCARNA_THREADS" -ge 1 ] \
   || die "RNAC_LOCARNA_THREADS must be a positive integer (got '$RNAC_LOCARNA_THREADS')"
+[[ "$RNAC_LOCARNA_MINSEQS" =~ ^[0-9]+$ ]] && [ "$RNAC_LOCARNA_MINSEQS" -ge 1 ] \
+  || die "RNAC_LOCARNA_MINSEQS must be a positive integer (got '$RNAC_LOCARNA_MINSEQS')"
 
 # An empty passed list is a legitimate result from step 3, not a failure.
 mapfile -t clusters < <(grep -v '^[[:space:]]*$' "$PASSED" || true)
@@ -80,21 +82,60 @@ log "fold temperature: ${RNAC_FOLD_TEMP} C   parallel jobs: $RNAC_JOBS x ${RNAC_
 # file last, by copying it out of the mlocarna tgtdir only after mlocarna has
 # exited 0, so its presence means the whole run completed -- unlike the tgtdir
 # itself, which appears immediately and is populated throughout.
+#
+# Before that, apply the size floor (RNAC_LOCARNA_MINSEQS): clusters with fewer
+# members than the floor are skipped and recorded in deferred_small.txt rather
+# than folded, because step 5 (RNA-SCoRE) would discard them for being below its
+# >=7 rank gate anyway. Member counts come from cluster_count.tsv (<count>\t<name>).
+# A cluster absent from that file, or the file being absent entirely, is treated
+# as count-unknown and folded rather than skipped -- the floor only ever drops a
+# cluster we can positively confirm is too small.
+
+declare -A nmemb=()
+if [ "$RNAC_LOCARNA_MINSEQS" -gt 1 ] && [ -s "$COUNTS" ]; then
+  while IFS=$'\t' read -r cnt cname; do
+    [ -n "${cname:-}" ] && nmemb["$cname"]=$cnt
+  done < "$COUNTS"
+elif [ "$RNAC_LOCARNA_MINSEQS" -gt 1 ]; then
+  warn "no cluster_count.tsv at $COUNTS — cannot apply size floor, folding all clusters"
+fi
+
+DEFERRED="$OUTDIR/deferred_small.txt"
+: > "$DEFERRED.tmp"
 
 todo=()
 missing=0
+deferred=0
 for name in "${clusters[@]}"; do
   if [ ! -s "$SPLITDIR/${name}_cluster.fasta" ]; then
     missing=$(( missing + 1 ))
     continue
   fi
+  # Size floor: skip only when we know the count and it is below the floor.
+  if [ "$RNAC_LOCARNA_MINSEQS" -gt 1 ]; then
+    c=${nmemb[$name]:-}
+    if [ -n "$c" ] && [ "$c" -lt "$RNAC_LOCARNA_MINSEQS" ]; then
+      printf '%s\t%s\n' "$name" "$c" >> "$DEFERRED.tmp"
+      deferred=$(( deferred + 1 ))
+      continue
+    fi
+  fi
   [ -s "$OUTDIR/$name/${name}_result.stk" ] && [ "$RNAC_FORCE" != "1" ] && continue
   todo+=("$name")
 done
 
+LC_ALL=C sort -t$'\t' -k2,2nr "$DEFERRED.tmp" > "$DEFERRED" 2>/dev/null || mv -f "$DEFERRED.tmp" "$DEFERRED"
+rm -f "$DEFERRED.tmp"
+
 [ "$missing" -eq 0 ] || warn "$missing passed cluster(s) have no FASTA in splits/"
-expected=$(( total - missing ))
-[ "$expected" -gt 0 ] || die "none of the passed clusters have a FASTA in $SPLITDIR"
+if [ "$deferred" -gt 0 ]; then
+  log "size floor (RNAC_LOCARNA_MINSEQS=$RNAC_LOCARNA_MINSEQS): deferring $deferred cluster(s) below $RNAC_LOCARNA_MINSEQS members — see $DEFERRED"
+  log "  (these cannot reach a Mid/High rank in step 5; lower the floor or set it to 1 to fold them anyway)"
+fi
+# expected = clusters we actually intend to fold (passed, present, above floor).
+expected=$(( total - missing - deferred ))
+[ "$expected" -gt 0 ] \
+  || die "no cluster left to fold: $total passed, $missing missing, $deferred below the size floor of $RNAC_LOCARNA_MINSEQS (lower RNAC_LOCARNA_MINSEQS)"
 
 # --- scheduling ------------------------------------------------------------
 #
@@ -162,6 +203,11 @@ FAILED="$OUTDIR/failed_clusters.txt"
 {
   for name in "${clusters[@]}"; do
     [ -s "$SPLITDIR/${name}_cluster.fasta" ] || continue
+    # A cluster deliberately deferred below the size floor is not a failure.
+    if [ "$RNAC_LOCARNA_MINSEQS" -gt 1 ]; then
+      c=${nmemb[$name]:-}
+      [ -n "$c" ] && [ "$c" -lt "$RNAC_LOCARNA_MINSEQS" ] && continue
+    fi
     [ -s "$OUTDIR/$name/${name}_result.stk" ] || printf '%s\n' "$name"
   done
 } | LC_ALL=C sort -u > "$FAILED.tmp"
@@ -193,6 +239,7 @@ printf '%-42s %10s\n' STAGE CLUSTERS
 printf '%-42s %10s\n' ------------------------------------------ ----------
 printf '%-42s %10s\n' "passed step 3 screening"            "$total"
 printf '%-42s %10s\n' "missing from splits/"               "$missing"
+printf '%-42s %10s\n' "below size floor (deferred)"        "$deferred"
 printf '%-42s %10s\n' "attempted this run"                 "${#todo[@]}"
 printf '%-42s %10s\n' "with a predicted structure"         "$n_done"
 printf '%-42s %10s\n' "failed"                             "$n_failed"

@@ -140,6 +140,28 @@ data_name="sandbox/data_protists_plt_July_31"
 # every other worker idle waiting for it. Order does not affect results.
 : "${RNAC_LOCARNA_ORDER:=size}"
 
+# Minimum cluster members required to fold at step 4. Clusters with fewer than
+# this are skipped and listed in deferred_small.txt instead of being folded.
+#
+# The point is throughput, not correctness. RNA-SCoRE (step 5) ranks an
+# alignment High at >=10 members and Mid at 7-9, and only High/Mid go forward;
+# a cluster below 7 cannot produce a usable rank no matter how long mlocarna
+# spends on it. Since step 4 is by far the slowest step and mlocarna cost grows
+# with members^2 x length, folding sub-threshold clusters is pure waste -- step 5
+# would discard every one. On divergent datasets the sub-7 clusters are the
+# large majority (~80%), so this is the difference between a tractable run and a
+# multi-week one.
+#
+#   7  fold only clusters that can reach a Mid/High rank on their own (aggressive)
+#   5  also keep 5-6 member clusters, which a later homolog search (step 6) could
+#      grow past 7 by adding sequences (conservative; preserves that headroom)
+#   1  fold everything with >=2 members, i.e. disable the floor (upstream behaviour)
+#
+# Default 5: this fork has no step 6 yet, but keeping 5-6 member clusters costs
+# little now and avoids re-folding them once homolog search is added. Set to 7
+# for the fastest run, or 1 to reproduce the unfiltered pipeline.
+: "${RNAC_LOCARNA_MINSEQS:=7}"
+
 # ---------------------------------------------------------------------------
 # Step 5 — evaluation (trim / RNA-SCoRE / R-scape)
 # ---------------------------------------------------------------------------
