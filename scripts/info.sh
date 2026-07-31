@@ -29,7 +29,8 @@ unset _repo_from_env
 # Root for all pipeline data. Every step writes into $RNAC_DATA/<stepname>/.
 # Overridable so you can point a test run at a scratch tree:
 #     RNAC_DATA=$HOME/sandbox/rna_test/data ./00_oneline.sh
-: "${RNAC_DATA:=$RNAC_REPO/data}"
+data_name="sandbox/data_protists_plt_July_31"
+: "${RNAC_DATA:=$RNAC_REPO/$data_name}"
 
 # Raw, unmodified input FASTAs. Nothing ever writes here.
 : "${RNAC_INPUT:=$RNAC_DATA/input}"
@@ -220,7 +221,7 @@ unset _repo_from_env
 # The upstream script re-scans the whole _all_seqs.fasta once per cluster, so
 # its cost is O(clusters x filesize); with thousands of clusters that dominates
 # the step. Both produce byte-identical output.
-: "${RNAC_SPLIT_METHOD:=repo}"
+: "${RNAC_SPLIT_METHOD:=awk}"
 
 # Remove mmseqs2 tmp directories when the step completes (they are large).
 : "${RNAC_CLEAN_MMSEQS_TMP:=1}"
