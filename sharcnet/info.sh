@@ -1,4 +1,5 @@
-#!/bin/bash
+## Holds information about the project directory and other path variables. 
+## This file is sourced by other scripts to access these variables.
 
 # Path variables
 project_dir=$(realpath "$project_dir")
