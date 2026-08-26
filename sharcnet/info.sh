@@ -18,8 +18,12 @@ logs_dir="$project_dir/logs"
 container_dir="$sharcnet_dir/containers"
 rnatools="$container_dir/rnatools_v2.1.sif"
 
+repo_dir=$(dirname "$sharcnet_dir")
+step_01_scripts="$repo_dir/step1_createWindows"
+
 ## Pipeline parameters
 window_size=250
 overlap=75
+windows_prefix="all_windows"
 
 fold_temperature=21

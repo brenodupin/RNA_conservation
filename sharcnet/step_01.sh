@@ -1,0 +1,53 @@
+#!/bin/bash
+#SBATCH --job-name=rnac_01
+#SBATCH --time=04:00:00
+#SBATCH --mem=16G
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=bdupin@uwo.ca
+
+# Create overlapping windows from PROJECT_DIR/00_oneline, merge them, remove
+# windows containing Ns or poly-nucleotide sequences, and remove duplicates.
+# Outputs are written to PROJECT_DIR/01_windows.
+#
+# Usage:
+#   sharcnet/submit.sh 01 PROJECT_DIR
+
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: sbatch $0 PROJECT_DIR" >&2
+    exit 1
+fi
+
+project_dir=$1
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/info.sh"
+
+mkdir -p "$step_01_dir"
+
+for fasta in "$step_00_dir"/*_oneLine.fasta; do
+    name=$(basename "$fasta" _oneLine.fasta)
+
+    perl "$step_01_scripts/createWindows.pl" \
+        -f "$fasta" \
+        -w "$window_size" \
+        -p "$overlap" \
+        -O "$step_01_dir/${name}_windows.fa"
+done
+
+combined="$step_01_dir/${windows_prefix}.fasta"
+processed="$step_01_dir/${windows_prefix}_processed"
+composition="$step_01_dir/${windows_prefix}_nuclComposition.tsv"
+
+cat "$step_01_dir"/*_windows.fa > "$combined"
+
+perl "$step_01_scripts/removeNs_polyN_windows.pl" \
+    "$combined" \
+    "$processed" \
+    > "$composition"
+
+perl "$step_01_scripts/removeDuplicates.pl" \
+    "${processed}_noNs_polyN"
+
+date
