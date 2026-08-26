@@ -46,3 +46,7 @@ filter_hits=1
 
 # multi-step parameters
 fold_temperature=21
+
+# Software modules
+seqtk_module="seqtk/VERSION"
+mmseqs_module="mmseqs2/VERSION"
