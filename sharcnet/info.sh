@@ -1,25 +1,35 @@
-## Holds information about the project directory and other path variables. 
+## Holds information about the data directory and other path variables. 
 ## This file is sourced by other scripts to access these variables.
 
-# Path variables
-project_dir=$(realpath "$project_dir")
 sharcnet_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-
-input_dir="$project_dir/input"
-step_00_dir="$project_dir/00_oneline"
-step_01_dir="$project_dir/01_windows"
-step_02_dir="$project_dir/02_clusters"
-step_03_dir="$project_dir/03_screen"
-step_04_dir="$project_dir/04_locarna"
-step_05_dir="$project_dir/05_evaluation"
-
-logs_dir="$project_dir/logs"
-
 container_dir="$sharcnet_dir/containers"
 rnatools="$container_dir/rnatools_v2.1.sif"
 
 repo_dir=$(dirname "$sharcnet_dir")
 step_01_scripts="$repo_dir/step1_createWindows"
+
+# Resolve the data directory from either:
+#   1. The path supplied directly.
+#   2. $SCRATCH/RNA_conservation/<name> on Alliance systems.
+
+if [[ -d "$data_dir" ]]; then
+    data_dir=$(realpath "$data_dir")
+elif [[ -n "${$SCRATCH:-}" && -d "$SCRATCH/$data_dir" ]]; then
+    data_dir=$(realpath "$SCRATCH/$data_dir")
+else
+    echo "Data directory not found: $data_dir" >&2
+    return 1
+fi
+
+input_dir="$data_dir/input"
+step_00_dir="$data_dir/00_oneline"
+step_01_dir="$data_dir/01_windows"
+step_02_dir="$data_dir/02_clusters"
+step_03_dir="$data_dir/03_screen"
+step_04_dir="$data_dir/04_locarna"
+step_05_dir="$data_dir/05_evaluation"
+
+logs_dir="$data_dir/logs"
 
 ## Pipeline parameters
 window_size=250

@@ -5,21 +5,21 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bdupin@uwo.ca
 
-# Create overlapping windows from PROJECT_DIR/00_oneline, merge them, remove
+# Create overlapping windows from DATA_DIR/00_oneline, merge them, remove
 # windows containing Ns or poly-nucleotide sequences, and remove duplicates.
-# Outputs are written to PROJECT_DIR/01_windows.
+# Outputs are written to DATA_DIR/01_windows.
 #
 # Usage:
-#   sharcnet/submit.sh 01 PROJECT_DIR
+#   sharcnet/submit.sh 01 DATA_DIR
 
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-    echo "Usage: sbatch $0 PROJECT_DIR" >&2
+    echo "Usage: sbatch $0 DATA_DIR" >&2
     exit 1
 fi
 
-project_dir=$1
+data_dir=$1
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$script_dir/info.sh"

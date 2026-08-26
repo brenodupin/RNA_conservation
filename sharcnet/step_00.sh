@@ -5,20 +5,20 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bdupin@uwo.ca
 
-# Convert multiline FASTA files from PROJECT_DIR/input into one-line FASTA
-# files in PROJECT_DIR/00_oneline.
+# Convert multiline FASTA files from DATA_DIR/input into one-line FASTA
+# files in DATA_DIR/00_oneline.
 #
 # Usage:
-#   sbatch sharcnet/step_00.sh PROJECT_DIR
+#   sbatch sharcnet/step_00.sh DATA_DIR
 
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-    echo "Usage: sbatch $0 PROJECT_DIR" >&2
+    echo "Usage: sbatch $0 DATA_DIR" >&2
     exit 1
 fi
 
-project_dir=$1
+data_dir=$1
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$script_dir/info.sh"
