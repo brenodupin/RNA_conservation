@@ -42,12 +42,13 @@ composition="$step_01_dir/${windows_prefix}_nuclComposition.tsv"
 
 cat "$step_01_dir"/*_windows.fa > "$combined"
 
-perl "$step_01_scripts/removeNs_polyN_windows.pl" \
-    "$combined" \
-    "$processed" \
-    > "$composition"
+perl "$step_01_scripts/removeNs_polyN_windows.pl" "$combined" "$processed" > "$composition"
 
-perl "$step_01_scripts/removeDuplicates.pl" \
-    "${processed}_noNs_polyN"
+perl "$step_01_scripts/removeDuplicates.pl" "${processed}_noNs_polyN"
+
+unique="${processed}_noNs_polyN_uniq.fasta"
+
+paste - - < "$unique" | LC_ALL=C sort -k1,1 | tr '\t' '\n' > "${unique}.sorted"
+mv "${unique}.sorted" "$unique"
 
 date

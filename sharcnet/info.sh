@@ -31,9 +31,18 @@ step_05_dir="$data_dir/05_evaluation"
 
 logs_dir="$data_dir/logs"
 
-## Pipeline parameters
+# step 1 parameters
 window_size=250
 overlap=75
 windows_prefix="all_windows"
 
+# step 2 parameters
+pid_pass_1=0.95
+pid_pass_2=0.50
+coverage=0.80
+kmer_per_seq=200
+cov_mode=0
+filter_hits=1
+
+# multi-step parameters
 fold_temperature=21

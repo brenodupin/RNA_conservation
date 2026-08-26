@@ -35,10 +35,7 @@ printf '  Script: %s\n' "$step_script"
 printf '\n'
 
 submission=$(
-    sbatch \
-        --parsable \
-        --output="$log_pattern" \
-        "$step_script" "$data_dir"
+    sbatch --parsable --output="$log_pattern" "$step_script" "$data_dir"
 )
 
 job_id=${submission%%;*}
