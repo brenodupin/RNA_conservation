@@ -10,11 +10,11 @@ step_01_scripts="$repo_dir/step1_createWindows"
 
 # Resolve the data directory from either:
 #   1. The path supplied directly.
-#   2. $SCRATCH/RNA_conservation/<name> on Alliance systems.
+#   2. $SCRATCH/<name> on Alliance systems.
 
 if [[ -d "$data_dir" ]]; then
     data_dir=$(realpath "$data_dir")
-elif [[ -n "${$SCRATCH:-}" && -d "$SCRATCH/$data_dir" ]]; then
+elif [[ -n "${SCRATCH:-}" && -d "$SCRATCH/$data_dir" ]]; then
     data_dir=$(realpath "$SCRATCH/$data_dir")
 else
     echo "Data directory not found: $data_dir" >&2

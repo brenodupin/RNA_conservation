@@ -28,10 +28,10 @@ mkdir -p "$logs_dir"
 
 printf '\n'
 printf 'Smith Lab RNA conservation.\n'
-printf '  Date:     %s\n' "$(date)"
-printf '  Step:     %s\n' "$step"
-printf '  Data:  %s\n' "$data_dir"
-printf '  Script:   %s\n' "$step_script"
+printf '  Date:   %s\n' "$(date)"
+printf '  Step:   %s\n' "$step"
+printf '  Data:   %s\n' "$data_dir"
+printf '  Script: %s\n' "$step_script"
 printf '\n'
 
 submission=$(
