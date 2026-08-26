@@ -44,9 +44,6 @@ kmer_per_seq=200
 cov_mode=0
 filter_hits=1
 
-# Step 3 parameters
-step_03_max_concurrent=100
-
 # multi-step parameters
 fold_temperature=21
 
