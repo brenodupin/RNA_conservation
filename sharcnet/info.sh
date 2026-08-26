@@ -44,9 +44,14 @@ kmer_per_seq=200
 cov_mode=0
 filter_hits=1
 
+# Step 3 parameters
+step_03_max_concurrent=100
+
 # multi-step parameters
 fold_temperature=21
 
 # Software modules
 seqtk_module="seqtk/VERSION"
 mmseqs_module="mmseqs2/VERSION"
+clustalo_module="clustal-omega/VERSION"
+apptainer_module="apptainer"
