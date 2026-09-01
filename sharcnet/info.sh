@@ -44,6 +44,11 @@ kmer_per_seq=200
 cov_mode=0
 filter_hits=1
 
+# step 4 parameters
+locarna_jobs=10
+locarna_threads=3
+locarna_timeout="24h"
+
 # multi-step parameters
 fold_temperature=21
 
