@@ -48,7 +48,7 @@ filter_hits=1
 fold_temperature=21
 
 # Software modules
-seqtk_module="seqtk/VERSION"
-mmseqs_module="mmseqs2/VERSION"
-clustalo_module="clustal-omega/VERSION"
-apptainer_module="apptainer"
+seqtk_module="seqtk/1.4"
+mmseqs_module="mmseqs2/17-b804f"
+clustalo_module="clustal-omega/1.2.4"
+apptainer_module="apptainer/1.4.5"
