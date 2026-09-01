@@ -26,6 +26,7 @@ echo " step_03a.sh: data_dir = $data_dir, script_dir = $script_dir"
 
 source "$script_dir/info.sh"
 
+module use "$HOME/.local/modulefiles"
 module load "$clustalo_module"
 
 cluster_count="$step_02_dir/cluster_count.tsv"
