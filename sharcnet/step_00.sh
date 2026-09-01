@@ -2,25 +2,26 @@
 #SBATCH --job-name=rnac_00
 #SBATCH --time=00:30:00
 #SBATCH --mem=1G
-#SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bdupin@uwo.ca
 
 # Convert multiline FASTA files from DATA_DIR/input into one-line FASTA
 # files in DATA_DIR/00_oneline.
 #
 # Usage:
-#   sbatch sharcnet/step_00.sh DATA_DIR
+#   sharcnet/submit.sh 00 DATA_DIR
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-    echo "Usage: sbatch $0 DATA_DIR" >&2
+if [[ $# -ne 2 ]]; then
+    echo "Usage: sbatch $0 DATA_DIR SHARCNET_DIR" >&2
     exit 1
 fi
 
 data_dir=$1
+script_dir=$2
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+echo " step_00.sh: data_dir = $data_dir, script_dir = $script_dir"
+
 source "$script_dir/info.sh"
 
 mkdir -p "$step_00_dir"

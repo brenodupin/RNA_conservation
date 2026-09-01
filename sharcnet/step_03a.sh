@@ -14,14 +14,16 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-    echo "Usage: sbatch $0 DATA_DIR" >&2
+if [[ $# -ne 2 ]]; then
+    echo "Usage: sbatch $0 DATA_DIR SHARCNET_DIR" >&2
     exit 1
 fi
 
 data_dir=$1
+script_dir=$2
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+echo " step_03a.sh: data_dir = $data_dir, script_dir = $script_dir"
+
 source "$script_dir/info.sh"
 
 module load "$clustalo_module"
