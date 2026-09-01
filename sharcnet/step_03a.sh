@@ -2,7 +2,7 @@
 #SBATCH --job-name=rnac_03a
 #SBATCH --time=04:00:00
 #SBATCH --cpus-per-task=10
-#SBATCH --mem=32G
+#SBATCH --mem=32000M
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bdupin@uwo.ca
 

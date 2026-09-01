@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=rnac_00
 #SBATCH --time=00:30:00
-#SBATCH --mem=1G
+#SBATCH --mem=1000M
 #SBATCH --mail-user=bdupin@uwo.ca
 
 # Convert multiline FASTA files from DATA_DIR/input into one-line FASTA

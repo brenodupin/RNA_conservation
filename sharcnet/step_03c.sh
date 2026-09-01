@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=rnac_03c
 #SBATCH --time=00:15:00
-#SBATCH --mem=1G
+#SBATCH --mem=1000M
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bdupin@uwo.ca
 
