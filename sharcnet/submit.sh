@@ -22,15 +22,7 @@ sharcnet_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$sharcnet_dir/info.sh"
 
 step_script="$sharcnet_dir/step_${step}.sh"
-
-# Array steps need %A_%a so tasks do not all write to the same log.
-if grep -q '^#SBATCH --array' "$step_script"; then
-    is_array=1
-    log_pattern="$logs_dir/step_${step}_%A_%a.out"
-else
-    is_array=0
-    log_pattern="$logs_dir/step_${step}_%j.out"
-fi
+log_pattern="$logs_dir/step_${step}_%j.out"
 
 mkdir -p "$logs_dir"
 
@@ -52,12 +44,7 @@ submission=$(
 )
 
 job_id=${submission%%;*}
-
-if ((is_array)); then
-    log_file="$logs_dir/step_${step}_${job_id}_*.out"
-else
-    log_file="$logs_dir/step_${step}_${job_id}.out"
-fi
+log_file="$logs_dir/step_${step}_${job_id}.out"
 
 printf '  ✓ Submitted job %s\n' "$job_id"
 printf '  → Log: %s\n\n' "$log_file"
