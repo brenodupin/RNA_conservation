@@ -3,3 +3,5 @@ sandbox/
 nohup.out
 
 sharcnet/containers/*.sif
+
+logs/
