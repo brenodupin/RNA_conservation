@@ -228,4 +228,7 @@ awk '
 
 mv "$result_tmp" "$result"
 
+echo "Completed cluster $cluster: $n_sequences sequences, result=$result"
+rm -rf "$target_dir" "$cluster_fasta" "$safe_fasta" "$id_map"
+
 date
