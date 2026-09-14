@@ -47,20 +47,21 @@ filter_hits=1
 # step 4 parameters (mlocarna via worker_04.sh, run as a Slurm array by
 # step_04a.sh / step_04b.sh)
 locarna_timeout="24h"
-step04_jobs=20     # max concurrent Slurm array tasks (the %N throttle)
+step04_jobs=20
+step04_max_submit=900
 
 # step 4a: small clusters
 step04a_cluster_min=7
 step04a_cluster_max=19
 step04a_cpus=3
-step04a_mem=6G
+step04a_mem=6000M
 step04a_time=1-01:00:00
 
 # step 4b: larger clusters (scaled up from 4a; no direct profiling yet)
 step04b_cluster_min=20
 step04b_cluster_max=49
 step04b_cpus=4
-step04b_mem=16G
+step04b_mem=16000M
 step04b_time=1-01:00:00
 
 # multi-step parameters

@@ -33,20 +33,24 @@
 #   sacct -j JOBID -X --format=JobID,State -P |
 #       awk -F'|' '$2=="FAILED"{print $1}' | sed 's/.*_//' | paste -sd,)
 #
+# Pass --force as a 4th argument to redo a cluster even if it already has a
+# result (step_04a.sh/step_04b.sh forward their own --force here too).
+#
 # Usage:
 #   sbatch [--array=... --cpus-per-task=N --mem=... --time=...] \
-#       worker_04.sh MANIFEST DATA_DIR SHARCNET_DIR
+#       worker_04.sh MANIFEST DATA_DIR SHARCNET_DIR [--force]
 
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-    echo "Usage: sbatch $0 MANIFEST DATA_DIR SHARCNET_DIR" >&2
+if [[ $# -lt 3 || $# -gt 4 ]]; then
+    echo "Usage: sbatch $0 MANIFEST DATA_DIR SHARCNET_DIR [--force]" >&2
     exit 1
 fi
 
 manifest=$1
 data_dir=$2
 script_dir=$3
+force=${4:-}
 
 source "$script_dir/info.sh"
 
@@ -88,8 +92,9 @@ echo "Array task: $SLURM_ARRAY_TASK_ID"
 echo "Cluster:    $cluster ($count members)"
 echo "Threads:    $threads"
 
-# The final Stockholm file is the completion marker.
-if [[ -s "$result" ]]; then
+# The final Stockholm file is the completion marker, unless --force says to
+# redo it anyway.
+if [[ -s "$result" && "$force" != "--force" ]]; then
     echo "Already completed, skipping."
     exit 0
 fi
