@@ -7,6 +7,7 @@ rnatools="$container_dir/rnatools_v2.1.sif"
 
 repo_dir=$(dirname "$sharcnet_dir")
 step_01_scripts="$repo_dir/step1_createWindows"
+step_05_scripts="$repo_dir/step5_evaluationOfRNAstructures"
 
 # Resolve the data directory from either:
 #   1. The path supplied directly.
@@ -63,6 +64,35 @@ step04b_cluster_max=49
 step04b_cpus=4
 step04b_mem=16000M
 step04b_time=1-01:00:00
+
+# step 5 parameters (trimAlignment.pl and RNA-SCoRE via step_05a.sh, R-scape
+# via step_05b.sh)
+
+# RNA-SCoRE thresholds. Step 6 scores its homolog hits with RNA-SCoRE too, at
+# its own thresholds, hence the step05 prefix.
+step05_rnascore_mt=0.5      # fraction of the motif's base pairs a sequence must form
+step05_rnascore_bp=0.75     # fraction of each stem's base pairs a sequence must form
+step05_rnascore_gc=0.30     # fraction of a stem's base pairs that must be G:C or C:G
+step05_rnascore_dupl=0      # 0 drops duplicate motif sequences, 1 keeps them
+
+# RNA-SCoRE keeps one sequence out of each set of identical motifs and writes
+# its rows in Perl's hash order, which is randomised per process: the rank is
+# the same every time, the cleaned alignment is not. Pinning the seed makes
+# reruns byte-identical, which is also what stops step_05b.sh from re-running
+# R-scape on clusters whose alignment did not actually change. Any value works
+# as long as it stays the same.
+perl_hash_seed=42
+
+# R-scape. Shared with steps 6 and 7, which run the same two-set test on their
+# own alignments.
+rscape_options="-s --cacofold"
+rscape_seed=42
+rscape_timeout="1h"
+
+# Clusters RNA-SCoRE ranks at or above this are handed to step_05b.sh.
+# High = 10 or more sequences passed, Mid = 7 to 9, Low = fewer (dropped).
+#   allowed: High | Mid
+rscape_min_rank=Mid
 
 # multi-step parameters
 fold_temperature=21
