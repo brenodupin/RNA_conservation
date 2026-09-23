@@ -223,6 +223,14 @@ printf '\n'
 # RNA-SCoRE away from motifs with no sequences in them.
 
 if ((todo_total > 0)); then
+    # A cluster being redone starts without its previous RNA-SCoRE results:
+    # if trimming fails this time, RNA-SCoRE never runs, and an old rank line
+    # left in place would be recorded as this run's result.
+    for cluster in "${todo[@]}"; do
+        base="$step_05_dir/$cluster/${cluster}_motif"
+        rm -f "${base}_rank.tsv" "${base}_cleaned.sto" "${base}_evaluated.tsv"
+    done
+
     for cluster in "${todo[@]}"; do
         printf '%s\0%s\0%s\0%s\0%s\0%s\0' \
             "$trim_pl" \
@@ -331,6 +339,29 @@ rm -f "$failed.tmp"
 
 failed_total=$(wc -l < "$failed")
 
+# A marker whose step 4 result is gone describes a cluster that no longer
+# exists; without this, step 5b would keep treating it as a candidate. Only the
+# marker goes -- the files stay for anyone who wants to look at them.
+declare -A folded=()
+
+for cluster in "${clusters[@]}"; do
+    folded[$cluster]=yes
+done
+
+retired=0
+
+while IFS= read -r -d '' marker; do
+    cluster=${marker%/*}
+    cluster=${cluster##*/}
+
+    [[ -n "${folded[$cluster]:-}" ]] && continue
+
+    rm -f "$marker"
+    retired=$((retired + 1))
+done < <(
+    find "$step_05_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_05a.txt' -print0
+)
+
 # ---------------------------------------------------------------------------
 # collated tables
 # ---------------------------------------------------------------------------
@@ -417,6 +448,11 @@ printf '%-42s %10s\n' "  ranked High"                      "$high"
 printf '%-42s %10s\n' "  ranked Mid"                       "$mid"
 printf '%-42s %10s\n' "  ranked Low (dropped)"             "$low"
 printf '%-42s %10s\n' "failed"                             "$failed_total"
+
+if ((retired > 0)); then
+    printf '%-42s %10s\n' "markers cleared, step 4 result gone" "$retired"
+fi
+
 printf '\n'
 printf '  Evaluation:  %s\n' "$evaluation"
 printf '  Status:      %s\n' "$step_05_dir/step_05_status.tsv"

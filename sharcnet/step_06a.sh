@@ -179,6 +179,31 @@ mapfile -t clusters < <(printf '%s\n' "${!seed[@]}" | grep -v '^$' | LC_ALL=C so
 
 cluster_total=${#clusters[@]}
 
+# Clusters searched in this round earlier that step 5 no longer passes (or,
+# with --list/--seeds, that are not listed) are left alone -- a search is too
+# expensive to delete on a guess -- but 06b and 06c keep working on them, so
+# say which they are.
+if [[ -d "$round_dir" ]]; then
+    stale_rounds=()
+
+    while IFS= read -r -d '' marker; do
+        cluster=${marker%/*}
+        cluster=${cluster##*/}
+        [[ -n "${seed[$cluster]:-}" ]] || stale_rounds+=("$cluster")
+    done < <(
+        find "$round_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_06a.txt' -print0
+    )
+
+    if ((${#stale_rounds[@]} > 0)) && [[ -z "$list_file" && -z "$seeds_file" ]]; then
+        echo \
+            "Note: ${#stale_rounds[@]} cluster(s) in $round_dir are no longer" \
+            "selected by step 5 but keep their results; delete their folders" \
+            "to drop them from this round:" \
+            >&2
+        printf '  %s\n' "${stale_rounds[@]}" >&2
+    fi
+fi
+
 if ((cluster_total == 0)); then
     echo \
         "No seed alignments for round $step06_round" \

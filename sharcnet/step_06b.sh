@@ -212,6 +212,13 @@ printf '\n'
 # ---------------------------------------------------------------------------
 
 if ((todo_total > 0)); then
+    # A cluster being redone starts without its previous RNA-SCoRE results, so
+    # a failed realignment cannot leave an old rank line to be recorded.
+    for cluster in "${todo[@]}"; do
+        base="$round_dir/$cluster/${cluster}_hits"
+        rm -f "${base}_rank.tsv" "${base}_cleaned.sto" "${base}_evaluated.tsv"
+    done
+
     for cluster in "${todo[@]}"; do
         ((${hits[$cluster]:-0} > 0)) || continue
 
@@ -226,9 +233,6 @@ if ((todo_total > 0)); then
         xargs -0 -r -P "$threads" -n6 "$align_worker" || true
 
     for cluster in "${todo[@]}"; do
-        # An old rank line must not outlive a failed realignment.
-        rm -f "$round_dir/$cluster/${cluster}_hits_rank.tsv"
-
         [[ -s "$round_dir/$cluster/${cluster}_hits.sto" ]] || continue
 
         printf '%s\0%s\0%s\0%s\0%s\0%s\0%s\0%s\0%s\0' \
@@ -426,6 +430,23 @@ rm -f "$failed.tmp"
 
 failed_total=$(wc -l < "$failed")
 
+# A 06b marker whose 06a search is no longer done (it was redone and failed, or
+# is queued again) describes hits that are being replaced: clear it, and step
+# 06c then clears the R-scape result built on it.
+retired=0
+
+while IFS= read -r -d '' marker; do
+    cluster=${marker%/*}
+    cluster=${cluster##*/}
+
+    [[ -n "${found[$cluster]:-}" ]] && continue
+
+    rm -f "$marker"
+    retired=$((retired + 1))
+done < <(
+    find "$round_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_06b.txt' -print0
+)
+
 # ---------------------------------------------------------------------------
 # collated tables
 # ---------------------------------------------------------------------------
@@ -559,6 +580,11 @@ printf '%-42s %10s\n' "  ranked High"                      "$high"
 printf '%-42s %10s\n' "  ranked Mid"                       "$mid"
 printf '%-42s %10s\n' "  ranked Low (dropped)"             "$low"
 printf '%-42s %10s\n' "failed"                             "$failed_total"
+
+if ((retired > 0)); then
+    printf '%-42s %10s\n' "markers cleared, 06a search not done" "$retired"
+fi
+
 printf '\n'
 printf '  Evaluation:    %s\n' "$evaluation"
 printf '  Seed recovery: %s\n' "$recovery"
