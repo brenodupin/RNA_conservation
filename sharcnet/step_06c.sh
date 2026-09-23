@@ -1,56 +1,51 @@
 #!/bin/bash
-#SBATCH --job-name=rnac_05b
+#SBATCH --job-name=rnac_06c
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=32000M
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bdupin@uwo.ca
 
-# Test the motifs step 05a kept for covariation, with R-scape's two-set test
-# and CaCoFold. Outputs are written next to the alignment they came from, in
-# DATA_DIR/05_evaluation/<cluster>.
+# Test the hits alignments step 06b kept for covariation, with R-scape's
+# two-set test and CaCoFold -- the same test step 05b runs on the seeds, now on
+# the seed plus its homologs. Works on the current round (step06_round in
+# info.sh), in DATA_DIR/06_homolog/round_<n>/<cluster>.
 #
-# The clusters tested are the ones RNA-SCoRE ranked at or above
-# rscape_min_rank (info.sh): High only, or High and Mid as upstream does.
-# --list FILE runs a hand-picked set instead, one cluster name per line, blank
-# lines and lines starting with # ignored -- copy high_mid_clusters.txt, cut it
-# down after reading step_05_status.tsv, and pass it back here.
+# The clusters tested are the ones whose hits RNA-SCoRE ranked at or above
+# step06_min_rank (info.sh). --list FILE runs a hand-picked set instead, one
+# cluster name per line, blank lines and lines starting with # ignored.
 #
-# A cluster is done when it has a <cluster>_result_05b.txt marker. As in 05a
-# the marker records the md5 of the alignment it was built from, here
-# <cluster>_motif_cleaned.sto, so rerunning 05a does not send unchanged
-# clusters back through R-scape: with perl_hash_seed pinned, RNA-SCoRE writes
-# the same cleaned alignment every time. --force redoes everything.
+# A cluster is done when it has a <cluster>_result_06c.txt marker recording
+# the md5 of <cluster>_hits_cleaned.sto, so rerunning 06b does not send
+# unchanged clusters back through R-scape. --force redoes everything. A run
+# without --list also clears the R-scape output of any cluster no longer ranked
+# high enough, including clusters tested earlier through --list.
 #
-# A run without --list also clears the R-scape output of any cluster that is no
-# longer ranked high enough, so refolding one in step 4 cannot leave a result
-# behind that describes an alignment that no longer exists. That includes
-# clusters tested earlier through --list.
+# --optional-outputs also renders the cleaned hits alignment and CaCoFold's
+# alignment as HTML (stockholm_to_html.pl), for comparing the two structures
+# by eye as the step 6 README describes. The R2R drawings of both structures
+# are always there, in <cluster>_hits_rscape/.
 #
-# Per cluster, in DATA_DIR/05_evaluation/<cluster>:
-#   <cluster>_rscape/               everything R-scape produced, including the
-#                                   .power counts and the R2R drawings of the
-#                                   given and the CaCoFold structure
-#   <cluster>_rscape.log            R-scape's own output
-#   <cluster>_rscape_covariation.tsv  the counts for this cluster
-#   <cluster>_result_05b.txt        the marker
+# Per cluster, in DATA_DIR/06_homolog/round_<n>/<cluster>:
+#   <cluster>_hits_rscape/              everything R-scape produced
+#   <cluster>_hits_rscape.log           R-scape's own output
+#   <cluster>_hits_rscape_covariation.tsv  the counts for this cluster
+#   <cluster>_result_06c.txt            the marker
 #
-# And for the run as a whole, in DATA_DIR/05_evaluation:
-#   rscape_covariation.tsv          every cluster's counts, most covariation
-#                                   first
-#   passed_covariation.txt          clusters with at least
-#                                   covariation_min_percent (info.sh) of their
-#                                   base pairs covarying -> step 6
-#   failed_05b.tsv                  clusters with no result, and why
-#   step_05_status.tsv              one row per cluster (see status_05.sh)
+# And for the round as a whole, in DATA_DIR/06_homolog/round_<n>:
+#   hits_covariation.tsv      every cluster's counts, most covariation first
+#   passed_covariation.txt    clusters with at least covariation_min_percent
+#                             (info.sh) of their base pairs covarying -> step 7
+#   failed_06c.tsv            clusters with no result, and why
+#   step_06_status.tsv        one row per cluster (see status_06.sh)
 #
 # Usage:
-#   sharcnet/submit.sh 05b DATA_DIR [--force] [--list FILE]
+#   sharcnet/submit.sh 06c DATA_DIR [--force] [--list FILE] [--optional-outputs]
 
 set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
-    echo "Usage: sbatch $0 DATA_DIR SHARCNET_DIR [--force] [--list FILE]" >&2
+    echo "Usage: sbatch $0 DATA_DIR SHARCNET_DIR [--force] [--list FILE] [--optional-outputs]" >&2
     exit 1
 fi
 
@@ -60,11 +55,15 @@ shift 2
 
 force=no
 list_file=
+optional_outputs=no
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --force)
             force=yes
+            ;;
+        --optional-outputs)
+            optional_outputs=yes
             ;;
         --list)
             [[ $# -ge 2 ]] || {
@@ -75,36 +74,38 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            echo "Unknown argument: $1 (expected --force or --list FILE)" >&2
+            echo "Unknown argument: $1 (expected --force, --list FILE or --optional-outputs)" >&2
             exit 1
             ;;
     esac
     shift
 done
 
-echo " step_05b.sh: data_dir = $data_dir, script_dir = $script_dir"
+echo " step_06c.sh: data_dir = $data_dir, script_dir = $script_dir"
 
 source "$script_dir/info.sh"
 
 rscape_worker="$script_dir/worker_rscape.sh"
-status_script="$script_dir/status_05.sh"
+html_worker="$script_dir/worker_html.sh"
+status_script="$script_dir/status_06.sh"
+round_dir="$step_06_dir/round_$step06_round"
 
-[[ -d "$step_05_dir" ]] || {
-    echo "Missing step 5 output: $step_05_dir -- run step 05a first." >&2
+[[ -d "$round_dir" ]] || {
+    echo "Missing round $step06_round of step 6: $round_dir -- run step 06a first." >&2
     exit 1
 }
 
-for script in "$rscape_worker" "$status_script"; do
+for script in "$rscape_worker" "$html_worker" "$status_script"; do
     [[ -x "$script" ]] || {
         echo "Not executable: $script" >&2
         exit 1
     }
 done
 
-case $rscape_min_rank in
+case $step06_min_rank in
     High | Mid) ;;
     *)
-        echo "rscape_min_rank must be High or Mid, got '$rscape_min_rank'" >&2
+        echo "step06_min_rank must be High or Mid, got '$step06_min_rank'" >&2
         exit 1
         ;;
 esac
@@ -118,22 +119,25 @@ module load "$apptainer_module"
 
 threads=${SLURM_CPUS_PER_TASK:-1}
 
-settings=$(printf 'options=%s seed=%s' "$rscape_options" "$rscape_seed")
+settings=$(
+    printf 'options=%s seed=%s optional_outputs=%s' \
+        "$rscape_options" "$rscape_seed" "$optional_outputs"
+)
 
 # ---------------------------------------------------------------------------
 # which clusters to test
 # ---------------------------------------------------------------------------
 #
-# From the 05a markers rather than from allClusters_evaluation.tsv: the markers
-# are what 05a itself treats as the record of a finished cluster, and they
-# cannot have been edited by hand between the two steps.
+# From the 06b markers rather than from hits_evaluation.tsv, for the same
+# reason step 05b reads the 05a markers: they are the record of a finished
+# cluster, and nobody edits them by hand.
 
 declare -A rank=()
 
 while IFS=$'\t' read -r cluster field value; do
     [[ "$field" == rank ]] && rank[$cluster]=$value
 done < <(
-    find "$step_05_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_05a.txt' -print0 |
+    find "$round_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_06b.txt' -print0 |
         xargs -0 -r awk -F '\t' '
             FNR == 1 {
                 split(FILENAME, path, "/")
@@ -154,7 +158,7 @@ for cluster in "${!rank[@]}"; do
             candidates+=("$cluster")
             ;;
         Mid)
-            [[ "$rscape_min_rank" == Mid ]] && candidates+=("$cluster")
+            [[ "$step06_min_rank" == Mid ]] && candidates+=("$cluster")
             ;;
     esac
 done
@@ -184,7 +188,7 @@ fi
 # Nothing to test is not a reason to stop early: the cleanup below still has
 # to clear results left by clusters that no longer qualify.
 if ((${#run_set[@]} == 0)); then
-    echo "No cluster ranked $rscape_min_rank or better in $step_05_dir -- nothing to test."
+    echo "No hits alignment ranked $step06_min_rank or better in $round_dir -- nothing to test."
 fi
 
 # Candidates and listed clusters together. The failure list and the covariation
@@ -202,7 +206,7 @@ alignments=()
 missing=()
 
 for cluster in "${run_set[@]}"; do
-    cleaned="$step_05_dir/$cluster/${cluster}_motif_cleaned.sto"
+    cleaned="$round_dir/$cluster/${cluster}_hits_cleaned.sto"
 
     if [[ -s "$cleaned" ]]; then
         alignments+=("$cleaned")
@@ -234,7 +238,7 @@ while IFS=$'\t' read -r cluster field value; do
             ;;
     esac
 done < <(
-    find "$step_05_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_05b.txt' -print0 |
+    find "$round_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_06c.txt' -print0 |
         xargs -0 -r awk -F '\t' '
             FNR == 1 {
                 split(FILENAME, path, "/")
@@ -267,64 +271,83 @@ done
 todo_total=${#todo[@]}
 
 if [[ -n "$list_file" ]]; then
-    printf 'Step 05b: %s cluster(s) listed, %s already done, %s to test.\n' \
-        "${#run_set[@]}" "$unchanged" "$todo_total"
+    printf 'Step 06c, round %s: %s cluster(s) listed, %s already done, %s to test.\n' \
+        "$step06_round" "${#run_set[@]}" "$unchanged" "$todo_total"
     printf '  List:     %s (%s ranked %s or better in all)\n' \
-        "$list_file" "$candidate_total" "$rscape_min_rank"
+        "$list_file" "$candidate_total" "$step06_min_rank"
 else
-    printf 'Step 05b: %s cluster(s) ranked %s or better, %s already done, %s to test.\n' \
-        "$candidate_total" "$rscape_min_rank" "$unchanged" "$todo_total"
+    printf 'Step 06c, round %s: %s cluster(s) ranked %s or better, %s already done, %s to test.\n' \
+        "$step06_round" "$candidate_total" "$step06_min_rank" "$unchanged" "$todo_total"
 fi
 
 printf '  Workers:  %s\n' "$threads"
 printf '  R-scape:  %s (seed %s, timeout %s)\n' \
     "$rscape_options" "$rscape_seed" "$rscape_timeout"
-
 printf '\n'
 
 if ((${#missing[@]} > 0)); then
-    printf '  %s cluster(s) have no _motif_cleaned.sto and are skipped.\n\n' \
+    printf '  %s cluster(s) have no _hits_cleaned.sto and are skipped.\n\n' \
         "${#missing[@]}"
 fi
 
 # ---------------------------------------------------------------------------
-# run R-scape
+# run R-scape, then the optional HTML views
 # ---------------------------------------------------------------------------
 
 if ((todo_total > 0)); then
     for cluster in "${todo[@]}"; do
         printf '%s\0%s\0%s\0%s\0%s\0%s\0%s\0%s\0' \
             "$rnatools" \
-            "$step_05_dir/$cluster" \
-            "${cluster}_motif_cleaned.sto" \
-            "${cluster}_rscape" \
-            "${cluster}_rscape" \
+            "$round_dir/$cluster" \
+            "${cluster}_hits_cleaned.sto" \
+            "${cluster}_hits_rscape" \
+            "${cluster}_hits_rscape" \
             "$rscape_seed" \
             "$rscape_timeout" \
             "$rscape_options"
     done |
         xargs -0 -r -P "$threads" -n8 "$rscape_worker" || true
+
+    for cluster in "${todo[@]}"; do
+        cluster_dir="$round_dir/$cluster"
+        rm -f "$cluster_dir/${cluster}_hits_cleaned.html"
+
+        [[ "$optional_outputs" == yes ]] || continue
+        [[ -s "$cluster_dir/${cluster}_hits_rscape_covariation.tsv" ]] || continue
+
+        printf '%s\0%s\0%s\0%s\0%s\0' \
+            "$rnatools" "$cluster_dir" \
+            "${cluster}_hits_cleaned.sto" "${cluster}_hits_cleaned.html" \
+            "$riboswitch_scripts"
+
+        cacofold="${cluster}_hits_rscape/${cluster}_hits_rscape.cacofold.sto"
+
+        if [[ -s "$cluster_dir/$cacofold" ]]; then
+            printf '%s\0%s\0%s\0%s\0%s\0' \
+                "$rnatools" "$cluster_dir" \
+                "$cacofold" "${cacofold%.sto}.html" \
+                "$riboswitch_scripts"
+        fi
+    done |
+        xargs -0 -r -P "$threads" -n5 "$html_worker" || true
 fi
 
 # ---------------------------------------------------------------------------
 # markers and failures
 # ---------------------------------------------------------------------------
 #
-# As in 05a, what happened is read back off disk: the covariation file is the
-# last thing worker_rscape.sh writes, so a cluster that has one is done. The
-# markers are written for what this run tested; the failure list then covers
-# every cluster considered, which is how an earlier failure survives a run with
-# --list. A candidate this run did not touch and that never ran is neither done
-# nor failed, so it is left out of the list and shows up as pending in
-# step_05_status.tsv.
+# As in step 05b: the covariation file is the last thing worker_rscape.sh
+# writes, so a cluster that has one is done. The failure list covers every
+# cluster considered, so a run with --list keeps what a full run recorded; a
+# candidate that was never tested shows up as pending in step_06_status.tsv.
 
-failed="$step_05_dir/failed_05b.tsv"
+failed="$round_dir/failed_06c.tsv"
 finished_at=$(date '+%Y-%m-%d %H:%M:%S')
 
 for cluster in "${todo[@]}"; do
-    cluster_dir="$step_05_dir/$cluster"
-    covariation="$cluster_dir/${cluster}_rscape_covariation.tsv"
-    marker="$cluster_dir/${cluster}_result_05b.txt"
+    cluster_dir="$round_dir/$cluster"
+    covariation="$cluster_dir/${cluster}_hits_rscape_covariation.tsv"
+    marker="$cluster_dir/${cluster}_result_06c.txt"
 
     if [[ ! -s "$covariation" ]]; then
         rm -f "$marker"
@@ -337,7 +360,8 @@ for cluster in "${todo[@]}"; do
 
     {
         printf 'cluster\t%s\n' "$cluster"
-        printf 'input\t%s\n' "$cluster_dir/${cluster}_motif_cleaned.sto"
+        printf 'round\t%s\n' "$step06_round"
+        printf 'input\t%s\n' "$cluster_dir/${cluster}_hits_cleaned.sto"
         printf 'input_md5\t%s\n' "${input_md5[$cluster]}"
         printf 'settings\t%s\n' "$settings"
         printf 'bpairs\t%s\n' "$cluster_bpairs"
@@ -358,19 +382,19 @@ done
 : > "$failed.tmp"
 
 for cluster in "${considered[@]}"; do
-    cluster_dir="$step_05_dir/$cluster"
+    cluster_dir="$round_dir/$cluster"
 
-    [[ -s "$cluster_dir/${cluster}_result_05b.txt" ]] && continue
+    [[ -s "$cluster_dir/${cluster}_result_06c.txt" ]] && continue
 
-    if [[ ! -s "$cluster_dir/${cluster}_motif_cleaned.sto" ]]; then
+    if [[ ! -s "$cluster_dir/${cluster}_hits_cleaned.sto" ]]; then
         printf '%s\t%s\n' \
             "$cluster" \
-            "no _motif_cleaned.sto, nothing for R-scape to test" \
+            "no _hits_cleaned.sto, nothing for R-scape to test" \
             >> "$failed.tmp"
-    elif [[ -n "${attempted[$cluster]:-}" || -f "$cluster_dir/${cluster}_rscape.log" ]]; then
+    elif [[ -n "${attempted[$cluster]:-}" || -f "$cluster_dir/${cluster}_hits_rscape.log" ]]; then
         printf '%s\t%s\n' \
             "$cluster" \
-            "R-scape failed, see ${cluster}_rscape.log" \
+            "R-scape failed, see ${cluster}_hits_rscape.log" \
             >> "$failed.tmp"
     fi
 done
@@ -384,12 +408,9 @@ failed_total=$(wc -l < "$failed")
 # clusters that are no longer candidates
 # ---------------------------------------------------------------------------
 #
-# A cluster refolded by step 4 and rescored by 05a can come back ranked Low.
-# Its old R-scape output describes an alignment that no longer exists, so it is
-# removed rather than left to be read as a current result.
-#
-# Only when the candidates came from the markers: with --list every cluster
-# outside that hand-picked list would otherwise look retired.
+# A cluster whose search was redone in 06a and rescored in 06b can come back
+# ranked too low; its old R-scape output describes an alignment that no longer
+# exists. Only without --list, as in step 05b.
 
 stale=0
 
@@ -406,64 +427,43 @@ if [[ -z "$list_file" ]]; then
 
         [[ -n "${is_candidate[$cluster]:-}" ]] && continue
 
-        rm -rf "$cluster_dir/${cluster}_rscape"
+        rm -rf "$cluster_dir/${cluster}_hits_rscape"
         rm -f \
             "$marker" \
-            "$cluster_dir/${cluster}_rscape.log" \
-            "$cluster_dir/${cluster}_rscape_covariation.tsv"
+            "$cluster_dir/${cluster}_hits_rscape.log" \
+            "$cluster_dir/${cluster}_hits_rscape_covariation.tsv" \
+            "$cluster_dir/${cluster}_hits_cleaned.html"
 
         stale=$((stale + 1))
     done < <(
-        find "$step_05_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_05b.txt' -print0
+        find "$round_dir" -mindepth 2 -maxdepth 2 -type f -name '*_result_06c.txt' -print0
     )
 fi
 
 # ---------------------------------------------------------------------------
-# collated table
+# collated tables
 # ---------------------------------------------------------------------------
 
-covariation_table="$step_05_dir/rscape_covariation.tsv"
+covariation_table="$round_dir/hits_covariation.tsv"
+passed_covariation="$round_dir/passed_covariation.txt"
 
 {
     printf 'cluster\tbpairs\texpected\texpected_sd\tcovarying\tpercent_covarying\n'
 
     for cluster in "${considered[@]}"; do
-        covariation="$step_05_dir/$cluster/${cluster}_rscape_covariation.tsv"
-        [[ -s "$step_05_dir/$cluster/${cluster}_result_05b.txt" ]] || continue
+        covariation="$round_dir/$cluster/${cluster}_hits_rscape_covariation.tsv"
+        [[ -s "$round_dir/$cluster/${cluster}_result_06c.txt" ]] || continue
         [[ -s "$covariation" ]] || continue
         printf '%s\0' "$covariation"
     done |
         xargs -0 -r cat |
-        awk -F '\t' 'BEGIN { OFS = "\t" } { sub(/_motif_cleaned\.sto$/, "", $1); print }' |
+        awk -F '\t' 'BEGIN { OFS = "\t" } { sub(/_hits_cleaned\.sto$/, "", $1); print }' |
         LC_ALL=C sort -t $'\t' -k6,6gr -k1,1
 } > "$covariation_table.tmp"
 
 mv "$covariation_table.tmp" "$covariation_table"
 
-tested=$(($(wc -l < "$covariation_table") - 1))
-
-read -r with_covariation above_cutoff < <(
-    awk -F '\t' -v cutoff="$covariation_min_percent" '
-        NR == 1 {
-            next
-        }
-
-        {
-            if ($5 > 0) covarying++
-            if ($6 != "" && $6 >= cutoff) passed++
-        }
-
-        END {
-            printf "%d %d\n", covarying, passed
-        }
-    ' "$covariation_table"
-)
-
-# The hand-off to step 6: the clusters at or above the covariation cutoff. Like
-# high_mid_clusters.txt it is rebuilt every run; copy it before editing it by
-# hand, and pass the copy to step_06a.sh with --list.
-passed_covariation="$step_05_dir/passed_covariation.txt"
-
+# The hand-off to step 7, rebuilt every run: copy it before editing it by hand.
 awk -F '\t' -v cutoff="$covariation_min_percent" '
     NR > 1 && $6 != "" && $6 >= cutoff {
         print $1
@@ -474,8 +474,13 @@ awk -F '\t' -v cutoff="$covariation_min_percent" '
 
 mv "$passed_covariation.tmp" "$passed_covariation"
 
+tested=$(($(wc -l < "$covariation_table") - 1))
+passed_total=$(wc -l < "$passed_covariation")
+
+with_covariation=$(awk -F '\t' 'NR > 1 && $5 > 0 { n++ } END { print n + 0 }' "$covariation_table")
+
 "$status_script" "$data_dir" > /dev/null ||
-    echo "status_05.sh failed, step_05_status.tsv may be out of date" >&2
+    echo "status_06.sh failed, step_06_status.tsv may be out of date" >&2
 
 # ---------------------------------------------------------------------------
 # report
@@ -484,12 +489,12 @@ mv "$passed_covariation.tmp" "$passed_covariation"
 printf '\n'
 printf '%-42s %10s\n' STAGE CLUSTERS
 printf '%-42s %10s\n' ------------------------------------------ ----------
-printf '%-42s %10s\n' "ranked $rscape_min_rank or better"   "$candidate_total"
+printf '%-42s %10s\n' "hits ranked $step06_min_rank or better" "$candidate_total"
 printf '%-42s %10s\n' "already done, unchanged"             "$unchanged"
 printf '%-42s %10s\n' "tested this run"                     "$todo_total"
 printf '%-42s %10s\n' "with R-scape results"                "$tested"
 printf '%-42s %10s\n' "  any base pair covarying"           "$with_covariation"
-printf '%-42s %10s\n' "  at least $covariation_min_percent% covarying" "$above_cutoff"
+printf '%-42s %10s\n' "  at least $covariation_min_percent% covarying" "$passed_total"
 printf '%-42s %10s\n' "failed"                              "$failed_total"
 
 if ((stale > 0)); then
@@ -498,8 +503,8 @@ fi
 
 printf '\n'
 printf '  Covariation: %s\n' "$covariation_table"
-printf '  Step 6 list: %s (%s clusters)\n' "$passed_covariation" "$above_cutoff"
-printf '  Status:      %s\n' "$step_05_dir/step_05_status.tsv"
+printf '  Step 7 list: %s (%s clusters)\n' "$passed_covariation" "$passed_total"
+printf '  Status:      %s\n' "$round_dir/step_06_status.tsv"
 
 if ((failed_total > 0)); then
     printf '  Failures:    %s (%s clusters)\n' "$failed" "$failed_total"

@@ -29,6 +29,7 @@ step_02_dir="$data_dir/02_clusters"
 step_03_dir="$data_dir/03_screen"
 step_04_dir="$data_dir/04_locarna"
 step_05_dir="$data_dir/05_evaluation"
+step_06_dir="$data_dir/06_homolog"
 
 logs_dir="$data_dir/logs"
 
@@ -89,10 +90,61 @@ rscape_options="-s --cacofold"
 rscape_seed=42
 rscape_timeout="1h"
 
+# Share of an alignment's base pairs R-scape must find covarying for it to go
+# forward: from step 5 into the step 6 homolog search, and from step 6 on to
+# step 7. The step 6 README uses 5; the paper reports 2.
+covariation_min_percent=5
+
 # Clusters RNA-SCoRE ranks at or above this are handed to step_05b.sh.
 # High = 10 or more sequences passed, Mid = 7 to 9, Low = fewer (dropped).
 #   allowed: High | Mid
 rscape_min_rank=Mid
+
+# step 6 parameters (homolog search: cmbuild, cmcalibrate and cmsearch via
+# step_06a.sh as a Slurm array; cmalign and RNA-SCoRE via step_06b.sh; R-scape
+# via step_06c.sh)
+
+# Steps 6 and 7 are repeated, each round seeding the next with a better
+# alignment. Every round lives in its own 06_homolog/round_<n> directory, so an
+# earlier round is never overwritten. Round 1 seeds from step 5; later rounds
+# need a seed list (step_06a.sh --seeds).
+step06_round=1
+
+# FASTA searched for homologs. Empty = every genome in 00_oneline, concatenated
+# into 06_homolog/search_db.fa by step_06a.sh. Set a path to search a different
+# set (the paper searched 14034 plastid genomes, more than it clustered). The
+# md5 of the database is recorded per cluster, so changing it redoes the search.
+step06_search_db=
+
+# Infernal. Upstream (cmsearch_command.sh) searches in glocal mode (-g) and
+# reports hits at E <= 0.0001; the paper reports E 0.01. Extra cmcalibrate
+# options, e.g. "-L 0.1" to calibrate on less random sequence, trade accuracy of
+# the E-values for time; empty is Infernal's default.
+step06_cmsearch_evalue=0.0001
+step06_cmsearch_options="-g"
+step06_cmcalibrate_options=
+
+# RNA-SCoRE on the homolog hits: step 5's thresholds except a looser GC
+# requirement, as in the paper.
+step06_rnascore_mt=0.5
+step06_rnascore_bp=0.75
+step06_rnascore_gc=0.15
+step06_rnascore_dupl=0
+
+# Hits alignments RNA-SCoRE ranks at or above this are handed to step_06c.sh.
+#   allowed: High | Mid
+step06_min_rank=Mid
+
+# Helper scripts from the riboswitch methods of Barrick et al., inside the
+# rnatools container (cmsearch_reformatv1_1.pl, stockholm_to_html.pl).
+riboswitch_scripts="/home/usr/selected_scripts_riboswitch_method"
+
+# step 6a runs one Slurm array task per cluster, like step 4.
+step06_jobs=20
+step06_max_submit=900
+step06a_cpus=8
+step06a_mem=8000M
+step06a_time=12:00:00
 
 # multi-step parameters
 fold_temperature=21
