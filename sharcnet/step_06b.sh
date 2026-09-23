@@ -270,18 +270,23 @@ fi
 #
 # Seed sequences name the step 1 window they came from:
 #   <accession>_<counter>_<start>_<end>[r]-<motif start>_<motif end>[r]
-# with start 0-based and end exclusive, r for the reverse complement. (Seeds
-# from a later round, named like hits, <accession>/<from>-<to>_<strand>, are
-# read too.) A seed counts as recovered when a hit on the same accession and
-# strand overlaps that window: the motif coordinates trimAlignment.pl appends
-# are counted in alignment columns, not genome positions, so the window is the
-# only exact location the name carries.
+# with start 0-based and end exclusive, r for the reverse complement. Seeds
+# from a later round are named like hits, <accession>/<from>-<to>_<strand>,
+# and when step 7's hmmsearch realigned them they carry one more
+# /<from>-<to> (the part of that hit it aligned), which is ignored. A seed
+# counts as recovered when a hit on the same accession and strand overlaps
+# that window or hit: the motif coordinates trimAlignment.pl appends are
+# counted in alignment columns, not genome positions, so the window is the
+# only exact location a step 5 name carries.
 #
 # Prints: seed sequences, recovered, best hit is a seed (yes/no/-), new hits.
 
 seed_recovery() {  # seed_recovery <seed.sto> <hits.tbl>
     awk '
         function locate(id,    rest, w, a, b, t) {
+            # the /<from>-<to> hmmsearch adds after a hit name
+            if (id ~ /\/[0-9]+-[0-9]+_-?1\/[0-9]+-[0-9]+$/) sub(/\/[0-9]+-[0-9]+$/, "", id)
+
             if (match(id, /_[0-9]+_[0-9]+_[0-9]+r?(-[0-9]+_[0-9]+r?)?$/)) {
                 where_acc = substr(id, 1, RSTART - 1)
                 rest = substr(id, RSTART + 1)

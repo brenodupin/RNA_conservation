@@ -8,6 +8,7 @@ rnatools="$container_dir/rnatools_v2.1.sif"
 repo_dir=$(dirname "$sharcnet_dir")
 step_01_scripts="$repo_dir/step1_createWindows"
 step_05_scripts="$repo_dir/step5_evaluationOfRNAstructures"
+step_07_scripts="$repo_dir/step7_structure_sequence_compatibilityCheck"
 
 # Resolve the data directory from either:
 #   1. The path supplied directly.
@@ -30,6 +31,7 @@ step_03_dir="$data_dir/03_screen"
 step_04_dir="$data_dir/04_locarna"
 step_05_dir="$data_dir/05_evaluation"
 step_06_dir="$data_dir/06_homolog"
+step_07_dir="$data_dir/07_compat"
 
 logs_dir="$data_dir/logs"
 
@@ -78,10 +80,11 @@ step05_rnascore_dupl=0      # 0 drops duplicate motif sequences, 1 keeps them
 
 # RNA-SCoRE keeps one sequence out of each set of identical motifs and writes
 # its rows in Perl's hash order, which is randomised per process: the rank is
-# the same every time, the cleaned alignment is not. Pinning the seed makes
-# reruns byte-identical, which is also what stops step_05b.sh from re-running
-# R-scape on clusters whose alignment did not actually change. Any value works
-# as long as it stays the same.
+# the same every time, the cleaned alignment is not. Pinning the seed (with
+# key-order perturbation off, see worker_rnascore.sh) makes reruns
+# byte-identical, which is also what stops step_05b.sh and step_06c.sh from
+# re-running R-scape on alignments that did not actually change. Any value
+# works as long as it stays the same.
 perl_hash_seed=42
 
 # R-scape. Shared with steps 6 and 7, which run the same two-set test on their
@@ -145,6 +148,28 @@ step06_max_submit=900
 step06a_cpus=8
 step06a_mem=8000M
 step06a_time=12:00:00
+
+# step 7 parameters (structure/sequence compatibility via step_07.sh)
+
+# Which step 6 round step 7 works on. Step 7 round n reads
+# 06_homolog/round_<n> and writes 07_compat/round_<n>; its seed list is meant
+# for step 6 round n+1.
+step07_round=1
+
+# The step 6 alignment the representative and its structure come from:
+#   cleaned   <cluster>_hits_cleaned.sto, the hits RNA-SCoRE passed, with the
+#             structure carried from LocARNA through the covariance model
+#   cacofold  the same hits with the structure R-scape's CaCoFold predicted
+step07_input=cleaned
+
+# Extra hmmsearch options. Empty keeps HMMER's defaults: sequences the
+# representative's HMM does not include (E <= 0.01) are left out of the
+# realigned motif, which is the point of this step.
+step07_hmmsearch_options=
+
+# HMMER and easel are inside the rnatools container but not on its PATH.
+hmmer_bin="/rscape_v2.0.0.q/lib/hmmer/src"
+easel_bin="/rscape_v2.0.0.q/lib/hmmer/easel/miniapps"
 
 # multi-step parameters
 fold_temperature=21

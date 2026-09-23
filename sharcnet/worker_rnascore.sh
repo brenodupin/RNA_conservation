@@ -20,9 +20,13 @@
 # where the rank line this worker keeps comes from.
 #
 # Perl randomises hash order per process, and RNA-SCoRE iterates a hash to pick
-# which of a set of identical motif sequences to keep. PERL_HASH_SEED pins that,
-# so the cleaned alignment is the same on a rerun; the rank is the same either
-# way.
+# which of a set of identical motif sequences to keep, and to order the rows it
+# writes. PERL_HASH_SEED alone is not enough to pin that: Perl's default key
+# order still folds in every hash insertion the process has made, starting
+# with its environment variables, so two jobs with different environments
+# (every Slurm job) order the same input differently. PERL_PERTURB_KEYS=0 turns
+# that off, leaving the order to the seed alone, and the cleaned alignment is
+# then the same on every rerun. The rank is the same either way.
 #
 # Writes next to the alignment, where <base> is ALIGNMENT without .sto:
 #   <base>_cleaned.sto     the sequences that passed (only when at least two did)
@@ -70,7 +74,7 @@ rank="${base}_rank.tsv"
 
 rm -f "$cleaned" "$evaluated" "$errors" "$rank" "$rank.tmp" "$rank.line"
 
-if ! PERL_HASH_SEED="$hash_seed" \
+if ! PERL_HASH_SEED="$hash_seed" PERL_PERTURB_KEYS=0 \
     perl "$score_pl" \
         -e "$suffix" \
         -d "$duplicates" \
