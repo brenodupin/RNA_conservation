@@ -64,7 +64,7 @@ step04a_time=1-01:00:00
 # step 4b: larger clusters (scaled up from 4a; no direct profiling yet)
 step04b_cluster_min=20
 step04b_cluster_max=49
-step04b_cpus=4
+step04b_cpus=8
 step04b_mem=16000M
 step04b_time=1-01:00:00
 
