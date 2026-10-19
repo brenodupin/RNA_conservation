@@ -23,6 +23,10 @@ else
     return 1
 fi
 
+# The dataset name is derived from the data directory name, stripping any leading "data_".
+dataset=$(basename "$data_dir")
+dataset=${dataset#data_}
+
 input_dir="$data_dir/input"
 step_00_dir="$data_dir/00_oneline"
 step_01_dir="$data_dir/01_windows"

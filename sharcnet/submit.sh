@@ -47,6 +47,7 @@ submission=$(
     sbatch \
         --parsable \
         --output="$log_pattern" \
+        --job-name="rnac_${step}_${dataset}" \
         "$step_script" \
         "$data_dir" \
         "$sharcnet_dir" \

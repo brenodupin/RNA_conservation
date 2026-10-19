@@ -138,6 +138,7 @@ submission=$(
         --mail-type=END,FAIL \
         --mail-user=bdupin@uwo.ca \
         --output="$log_dir/%A_%a.out" \
+        --job-name="rnac_04a_${dataset}" \
         "$worker" \
         "${worker_args[@]}"
 )

@@ -376,7 +376,7 @@ worker_args=("$manifest" "$data_dir" "$script_dir" "$search_db" "$db_md5" "$sett
 submission=$(
     sbatch \
         --parsable \
-        --job-name=rnac_06a \
+        --job-name="rnac_06a_${dataset}" \
         --array="1-${submit_count}%${step06_jobs}" \
         --cpus-per-task="$step06a_cpus" \
         --mem="$step06a_mem" \
