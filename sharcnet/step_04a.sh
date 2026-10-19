@@ -130,7 +130,7 @@ worker_args=("$manifest" "$data_dir" "$script_dir")
 submission=$(
     sbatch \
         --parsable \
-        --job-name=rnac_04a \
+        --job-name="rnac_04a_${dataset}" \
         --array="1-${submit_count}%${step04_jobs}" \
         --cpus-per-task="$step04a_cpus" \
         --mem="$step04a_mem" \
@@ -138,7 +138,6 @@ submission=$(
         --mail-type=END,FAIL \
         --mail-user=bdupin@uwo.ca \
         --output="$log_dir/%A_%a.out" \
-        --job-name="rnac_04a_${dataset}" \
         "$worker" \
         "${worker_args[@]}"
 )
