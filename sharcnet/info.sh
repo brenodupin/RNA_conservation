@@ -202,3 +202,13 @@ seqtk_module="seqtk/1.4"
 mmseqs_module="mmseqs2/17-b804f"
 clustalo_module="clustal-omega/1.2.4"
 apptainer_module="apptainer/1.4.5"
+
+
+# Per-dataset overrides: DATA_DIR/info.sh, if present, is sourced last, so any
+# setting above (rounds, thresholds, search database...) can be changed for one
+# dataset without touching the others.
+if [[ -f "$data_dir/info.sh" ]]; then
+    echo " info.sh: overrides from $data_dir/info.sh" >&2
+    source "$data_dir/info.sh"
+fi
+
