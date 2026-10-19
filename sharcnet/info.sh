@@ -32,6 +32,7 @@ step_04_dir="$data_dir/04_locarna"
 step_05_dir="$data_dir/05_evaluation"
 step_06_dir="$data_dir/06_homolog"
 step_07_dir="$data_dir/07_compat"
+step_08_dir="$data_dir/08_rfam"
 
 logs_dir="$data_dir/logs"
 
@@ -166,6 +167,28 @@ step07_input=cleaned
 # representative's HMM does not include (E <= 0.01) are left out of the
 # realigned motif, which is the point of this step.
 step07_hmmsearch_options=
+
+# step 8 parameters (Rfam check of the next round's seeds via step_08.sh)
+
+# Which round step 8 works on. Step 8 round n reads 07_compat/round_<n> (or
+# --seeds FILE) and writes 08_rfam/round_<n>, including the seed list for step
+# 6 round n+1.
+step08_round=1
+
+# A cluster is a known Rfam family, and left out of the next round, when at
+# least this fraction of its seed sequences hit the same family. Changing it
+# needs no rescan.
+step08_min_fraction=0.5
+
+# cmscan options. --cut_ga uses each family's curated gathering threshold, so
+# a hit is a family assignment Rfam itself would make; --rfam and --nohmmonly
+# are what Rfam uses to annotate sequences.
+step08_cmscan_options="--cut_ga --rfam --nohmmonly"
+
+# Rfam covariance models (Rfam.cm pressed with cmpress, Rfam.clanin, VERSION),
+# kept outside the repository and the data directory so every project and
+# every round uses the same copy. Used by step 08.
+rfam_dir="/home/bdupin/projects/def-dsmit242/bdupin/rfam"
 
 # HMMER and easel are inside the rnatools container but not on its PATH.
 hmmer_bin="/rscape_v2.0.0.q/lib/hmmer/src"
