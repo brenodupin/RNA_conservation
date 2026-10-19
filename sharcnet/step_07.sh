@@ -279,7 +279,7 @@ pick_representative() {  # pick_representative <evaluated.tsv>
         }
     ' "$1" |
         LC_ALL=C sort -t $'\t' -k1,1gr -k2,2 |
-        head -n 30 |
+        awk 'NR <= 30' |
         awk -F '\t' '
             # Stem by stem, first difference decides, as compare_values() did.
             function better(a, b,    x, y, n, i) {
