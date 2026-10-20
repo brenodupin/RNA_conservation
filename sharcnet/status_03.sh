@@ -14,26 +14,41 @@
 # 03b worker creates its output file before RNALalifold runs, so an empty one
 # is a failed screen, not a cluster without structure.
 #
-# Usage:
-#   sharcnet/status_03.sh DATA_DIR [--list]
+# Step 3's per-cluster check is the slow part on a large dataset (one walk
+# over every cluster folder in 03_screen); everything else reads a handful of
+# files. --skip-03 leaves that walk out and reports the rest, including the
+# step 4 workload, which only needs the passed list.
 #
-# --list also prints every cluster step 3 did not finish, not just the first
-# few.
+# Usage:
+#   sharcnet/status_03.sh DATA_DIR [--list] [--skip-03]
+#
+# --list     also prints every cluster step 3 did not finish, not just the
+#            first few.
+# --skip-03  skips the aligned/screened check of step 3.
 
 set -euo pipefail
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "Usage: $0 DATA_DIR [--list]" >&2
+if [[ $# -lt 1 ]]; then
+    echo "Usage: $0 DATA_DIR [--list] [--skip-03]" >&2
     exit 1
 fi
 
 data_dir=$1
-list_all=${2:-}
+shift
 
-if [[ -n "$list_all" && "$list_all" != "--list" ]]; then
-    echo "Unknown argument: $list_all (expected --list)" >&2
-    exit 1
-fi
+list_all=
+skip_03=
+
+for argument in "$@"; do
+    case $argument in
+        --list) list_all=yes ;;
+        --skip-03) skip_03=yes ;;
+        *)
+            echo "Unknown argument: $argument (expected --list or --skip-03)" >&2
+            exit 1
+            ;;
+    esac
+done
 
 sharcnet_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$sharcnet_dir/info.sh"
@@ -173,36 +188,46 @@ passed_list="$step_03_dir/RNALalifold_passedList.txt"
 
 printf '\n== step 03: alignment and screening (RNALalifold at %s C) ==\n' "$fold_temperature"
 
-# one find per file type: name and size
-find "$step_03_dir" -mindepth 2 -maxdepth 2 -type f -name '*_aligned.aln' \
-    -printf '%f\t%s\n' 2> /dev/null | sed 's/_aligned\.aln\t/\t/' > "$work/aln.tsv" || true
-find "$step_03_dir" -mindepth 2 -maxdepth 2 -type f -name '*_RNALalifold.out' \
-    -printf '%f\t%s\n' 2> /dev/null | sed 's/_RNALalifold\.out\t/\t/' > "$work/fold.tsv" || true
+if [[ -n "$skip_03" ]]; then
+    row "aligned / screened (03a/03b)" "skipped" "(--skip-03)"
+else
+    # One walk over 03_screen for both file types: name, size, and modification
+    # time (for the passed-list check below).
+    find "$step_03_dir" -mindepth 2 -maxdepth 2 -type f \
+        \( -name '*_aligned.aln' -o -name '*_RNALalifold.out' \) \
+        -printf '%f\t%s\t%T@\n' 2> /dev/null > "$work/screen.tsv" || true
 
-awk -F '\t' '
-    FILENAME == ARGV[1] { if ($2 > 0) aln[$1] = 1; next }
-    FILENAME == ARGV[2] { if ($2 > 0) fold[$1] = 1; else empty[$1] = 1; next }
-    {
-        c = $2
-        if (!(c in aln))       print c "\tnot aligned (03a)"
-        else if (c in empty)   print c "\tRNALalifold output empty (03b failed)"
-        else if (!(c in fold)) print c "\tnot screened (03b)"
-    }
-' "$work/aln.tsv" "$work/fold.tsv" "$work/clusters.tsv" > "$work/unfinished.tsv"
+    awk -F '\t' '
+        $1 ~ /_aligned\.aln$/      { sub(/_aligned\.aln$/, "", $1);     print $1 "\t" $2 > aln;  next }
+        $1 ~ /_RNALalifold\.out$/  { sub(/_RNALalifold\.out$/, "", $1); print $1 "\t" $2 "\t" $3 > fold }
+    ' aln="$work/aln.tsv" fold="$work/fold.tsv" "$work/screen.tsv"
+    touch "$work/aln.tsv" "$work/fold.tsv"
 
-aligned=$(awk -F '\t' '$2 > 0' "$work/aln.tsv" | wc -l)
-screened=$(awk -F '\t' '$2 > 0' "$work/fold.tsv" | wc -l)
-unfinished=$(wc -l < "$work/unfinished.tsv")
+    awk -F '\t' '
+        FILENAME == ARGV[1] { if ($2 > 0) aln[$1] = 1; next }
+        FILENAME == ARGV[2] { if ($2 > 0) fold[$1] = 1; else empty[$1] = 1; next }
+        {
+            c = $2
+            if (!(c in aln))       print c "\tnot aligned (03a)"
+            else if (c in empty)   print c "\tRNALalifold output empty (03b failed)"
+            else if (!(c in fold)) print c "\tnot screened (03b)"
+        }
+    ' "$work/aln.tsv" "$work/fold.tsv" "$work/clusters.tsv" > "$work/unfinished.tsv"
 
-row "aligned (03a)" "$aligned" "of $clusters_total"
-row "screened (03b)" "$screened" "of $clusters_total"
-row "not finished" "$unfinished" "$( ((unfinished > 0)) && echo '<- rerun 03a/03b for these' )"
+    aligned=$(awk -F '\t' '$2 > 0' "$work/aln.tsv" | wc -l)
+    screened=$(awk -F '\t' '$2 > 0' "$work/fold.tsv" | wc -l)
+    unfinished=$(wc -l < "$work/unfinished.tsv")
 
-if ((unfinished > 0)); then
-    awk -F '\t' '{ n[$2]++ } END { for (k in n) printf "    %-40s %6d\n", k, n[k] }' "$work/unfinished.tsv"
-    printf '\n'
-    head -n "$shown" "$work/unfinished.tsv" | sed 's/^/    /'
-    ((unfinished > shown)) && printf '    ... %d more (--list shows all)\n' "$((unfinished - shown))"
+    row "aligned (03a)" "$aligned" "of $clusters_total"
+    row "screened (03b)" "$screened" "of $clusters_total"
+    row "not finished" "$unfinished" "$( ((unfinished > 0)) && echo '<- rerun 03a/03b for these' )"
+
+    if ((unfinished > 0)); then
+        awk -F '\t' '{ n[$2]++ } END { for (k in n) printf "    %-40s %6d\n", k, n[k] }' "$work/unfinished.tsv"
+        printf '\n'
+        head -n "$shown" "$work/unfinished.tsv" | sed 's/^/    /'
+        ((unfinished > shown)) && printf '    ... %d more (--list shows all)\n' "$((unfinished - shown))"
+    fi
 fi
 
 if [[ ! -s "$passed_list" ]]; then
@@ -213,15 +238,18 @@ fi
 LC_ALL=C sort -u "$passed_list" > "$work/passed.txt"
 passed=$(wc -l < "$work/passed.txt")
 
-awk -v p="$passed" -v s="$screened" 'BEGIN { if (s > 0) printf "%.1f\n", 100 * p / s; else print "-" }' \
-    > "$work/rate"
-row "passed (03c)" "$passed" "($(cat "$work/rate")% of screened)"
+if [[ -n "$skip_03" ]]; then
+    row "passed (03c)" "$passed" "of $clusters_total clusters"
+else
+    rate=$(awk -v p="$passed" -v s="$screened" 'BEGIN { if (s > 0) printf "%.1f", 100 * p / s; else printf "-" }')
+    row "passed (03c)" "$passed" "($rate% of screened)"
 
-# a passed list older than the newest screen may be missing clusters
-newest_fold=$(find "$step_03_dir" -mindepth 2 -maxdepth 2 -type f -name '*_RNALalifold.out' \
-    -newer "$passed_list" -print -quit 2> /dev/null || true)
-[[ -n "$newest_fold" ]] &&
-    printf '  note: some RNALalifold output is newer than the passed list -- rerun 03c\n'
+    # A passed list older than the newest screen may be missing clusters.
+    list_time=$(find "$passed_list" -maxdepth 0 -printf '%T@')
+    newer=$(awk -F '\t' -v t="$list_time" '$3 > t + 0 { n++ } END { print n + 0 }' "$work/fold.tsv")
+    ((newer > 0)) &&
+        printf '  note: %d RNALalifold output(s) newer than the passed list -- rerun 03c\n' "$newer"
+fi
 
 # ---------------------------------------------------------------------------
 # step 04 workload
